@@ -29,7 +29,7 @@ prompt_and_save_config() {
   read -rp "First Name: " FIRST_NAME
   read -rp "Last Name:  " LAST_NAME
   read -rp "Email:      " EMAIL
-  read -rp "Phone (E.164, e.g. +15551234567): " PHONE
+  read -rp "Phone (Format: +<country_code>.<number>, e.g. +1.5551234567): " PHONE
   read -rp "Street Address: " ADDR1
   read -rp "City:           " CITY
   read -rp "State/Region:   " STATE
@@ -114,6 +114,80 @@ function pause() {
   read -rp "Press ENTER to continue..."
 }
 
+# ── ENSURE LIGHTSAILCTL PLUGIN ─────────────────────────────────────
+
+ensure_lightsailctl() {
+  # Check if already in PATH
+  if command -v lightsailctl >/dev/null 2>&1; then
+    echo "✓ Lightsail Control plugin (lightsailctl) found in PATH."
+    return 0
+  fi
+
+  # Check if previously downloaded by this script
+  PLUGIN_DIR="$(pwd)/.lightsailctl_plugin_temp"
+  if [[ -x "$PLUGIN_DIR/lightsailctl" || -x "$PLUGIN_DIR/lightsailctl.exe" ]]; then
+    echo "✓ Found previously downloaded lightsailctl plugin."
+    export PATH="$PLUGIN_DIR:$PATH"
+    echo "✓ Added $PLUGIN_DIR to PATH for this session."
+    return 0
+  fi
+
+  # If not found, attempt download
+  echo "ℹ️ Lightsail Control plugin (lightsailctl) not found. Attempting to download..."
+  OS=$(uname -s)
+  ARCH=$(uname -m)
+  mkdir -p "$PLUGIN_DIR"
+  PLUGIN_PATH="$PLUGIN_DIR/lightsailctl"
+  DOWNLOAD_URL=""
+
+  case "$OS" in
+    Linux)
+      case "$ARCH" in
+        x86_64) DOWNLOAD_URL="https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" ;;
+        aarch64 | arm64) DOWNLOAD_URL="https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-arm64/lightsailctl" ;;
+        *) echo "❌ Unsupported Linux architecture for lightsailctl: $ARCH" >&2; rm -rf "$PLUGIN_DIR"; return 1 ;;
+      esac
+      ;;
+    Darwin)
+      # Docs only list amd64 for macOS. ARM might work via Rosetta 2.
+      if [[ "$ARCH" == "arm64" ]]; then
+         echo "ℹ️ Using macOS AMD64 build for lightsailctl on ARM64 architecture (requires Rosetta 2)."
+      elif [[ "$ARCH" != "x86_64" ]]; then
+         echo "❌ Unsupported macOS architecture: $ARCH" >&2; rm -rf "$PLUGIN_DIR"; return 1
+      fi
+      DOWNLOAD_URL="https://s3.us-west-2.amazonaws.com/lightsailctl/latest/darwin-amd64/lightsailctl"
+      ;;
+    CYGWIN*|MINGW32*|MSYS*|MINGW*)
+      # Assuming Windows AMD64
+      PLUGIN_PATH="$PLUGIN_DIR/lightsailctl.exe"
+      DOWNLOAD_URL="https://s3.us-west-2.amazonaws.com/lightsailctl/latest/windows-amd64/lightsailctl.exe"
+      ;;
+    *)
+      echo "❌ Unsupported OS for automatic lightsailctl download: $OS" >&2
+      echo "Please install it manually from: https://lightsail.aws.amazon.com/ls/docs/en_us/articles/amazon-lightsail-install-software" >&2
+      rm -rf "$PLUGIN_DIR"
+      return 1
+      ;;
+  esac
+
+  echo "  Downloading from $DOWNLOAD_URL..."
+  # Use curl with flags: -f (fail silently on HTTP errors), -s (silent), -S (show error), -L (follow redirects)
+  if curl -fsSL "$DOWNLOAD_URL" -o "$PLUGIN_PATH"; then
+     echo "  Download successful."
+     chmod +x "$PLUGIN_PATH"
+     # Add to PATH for this script execution
+     export PATH="$PLUGIN_DIR:$PATH"
+     echo "✓ lightsailctl downloaded to $PLUGIN_DIR and added to PATH for this session."
+     # Add cleanup trap
+     # trap "echo 'Cleaning up temporary lightsailctl...'; rm -rf '$PLUGIN_DIR'" EXIT
+     return 0
+  else
+     echo "❌ Download failed. Please install lightsailctl manually." >&2
+     rm -rf "$PLUGIN_DIR" # Clean up failed attempt
+     return 1
+  fi
+}
+
 # ── 0) INSTALL AWS CLI V2 IF NEEDED ────────────────────────────────
 
 if ! command -v aws >/dev/null 2>&1 || [[ "$(aws --version 2>&1)" != aws-cli/2* ]]; then
@@ -164,12 +238,15 @@ echo "👉 Step 1: Check Domain Availability & Confirm Registration"
 # Loop until an available domain is confirmed or user quits
 while true; do
   echo "Checking availability for '${DOMAIN}'…"
-  AVAILABILITY=$(aws route53domains check-domain-availability \
+  # Capture stdout and stderr, check exit code
+  AVAILABILITY_OUTPUT=$(aws route53domains check-domain-availability \
     --region "$AWS_REGION" \
     --domain-name "$DOMAIN" \
-    --query 'Availability' --output text)
+    --query 'Availability' --output text 2>&1) # Capture stderr to stdout
+  EXIT_CODE=$?
 
-  if [[ "$AVAILABILITY" == "AVAILABLE" ]]; then
+  # Check if the command was successful and domain is available
+  if [[ $EXIT_CODE -eq 0 ]] && [[ "$AVAILABILITY_OUTPUT" == "AVAILABLE" ]]; then
     echo "✅ Domain '${DOMAIN}' is available!"
     read -rp "Use this domain for registration? (y/N): " CONFIRM_DOMAIN
     if [[ "${CONFIRM_DOMAIN,,}" == "y" ]]; then
@@ -180,7 +257,20 @@ while true; do
       # Fall through to prompt for a new domain
     fi
   else
-    echo "❌ Domain '${DOMAIN}' is not available (${AVAILABILITY})."
+    # Handle unavailable, unsupported TLD, or other errors
+    if [[ $EXIT_CODE -ne 0 ]]; then
+      # Extract specific error if possible, otherwise show generic message
+      if echo "$AVAILABILITY_OUTPUT" | grep -q "UnsupportedTLD"; then
+         echo "❌ The TLD (ending) of '${DOMAIN}' is not supported for registration via AWS."
+      elif echo "$AVAILABILITY_OUTPUT" | grep -q "InvalidInput"; then
+         echo "❌ Invalid domain name format: '${DOMAIN}'. Please check for typos."
+      else
+         echo "❌ Error checking domain '${DOMAIN}': $AVAILABILITY_OUTPUT"
+      fi
+    else
+      # Successful command but domain not available
+      echo "❌ Domain '${DOMAIN}' is not available (${AVAILABILITY_OUTPUT})."
+    fi
     # Fall through to prompt for a new domain
   fi
 
@@ -282,8 +372,14 @@ aws lightsail create-container-service \
 
 pause
 
+# Ensure lightsailctl is available before proceeding to push
+echo ""
+echo "👉 Checking for Lightsail Control plugin (lightsailctl)..."
+ensure_lightsailctl || { echo "❌ Failed to ensure lightsailctl is available. Exiting." >&2; exit 1; }
+
 # ── 3) BUILD & PUSH DOCKER IMAGE ───────────────────────────────────
 
+echo ""
 echo "👉 Step 3: Build & push Docker image"
 # Use the SERVICE_NAME obtained above
 docker build -t "$SERVICE_NAME:latest" .

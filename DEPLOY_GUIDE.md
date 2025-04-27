@@ -24,7 +24,7 @@ The script requires AWS credentials with permissions to manage Route 53 Domains 
     *   Choose **Attach policies directly**.
     *   Click **Create policy**. This will open a new browser tab.
         *   In the new tab, select the **JSON** tab.
-        *   Delete the placeholder content and paste the following JSON policy definition. This grants full access to **both** Lightsail and Route 53 Domains:
+        *   Delete the placeholder content and paste the following JSON policy definition. This grants full access to Lightsail, Route 53 Domains, and standard Route 53 actions (needed for hosted zone creation):
           ```json
           {
               "Version": "2012-10-17",
@@ -42,18 +42,25 @@ The script requires AWS credentials with permissions to manage Route 53 Domains 
                           "route53domains:*"
                       ],
                       "Resource": "*"
+                  },
+                  {
+                      "Effect": "Allow",
+                      "Action": [
+                          "route53:*"
+                      ],
+                      "Resource": "*"
                   }
               ]
           }
           ```
         *   Click **Next: Tags** (adding tags is optional).
         *   Click **Next: Review**.
-        *   Enter a **Name** for the policy (e.g., `LightsailAndRoute53DomainsFullAccessCustom`).
+        *   Enter a **Name** for the policy (e.g., `LightsailRoute53AndDomainsFullAccessCustom`).
         *   (Optional) Add a description.
         *   Click **Create policy**.
         *   Close this browser tab and return to the original "Create user" tab.
     *   Back in the "Create user" tab, click the refresh button next to the "Create policy" button.
-    *   In the filter policies search box, search for the policy you just created (e.g., `LightsailAndRoute53DomainsFullAccessCustom`) and select it.
+    *   In the filter policies search box, search for the policy you just created (e.g., `LightsailRoute53AndDomainsFullAccessCustom`) and select it.
     *   *(Optional Security Note: For production environments, it's recommended to create a custom IAM policy with only the specific permissions required by the script instead of using these broad full-access policies.)*
     *   Click **Next**.
 5.  **Review and Create:**
@@ -88,6 +95,7 @@ The script requires AWS credentials with permissions to manage Route 53 Domains 
     *   `Enter AWS Region [us-east-1]:` (Press Enter to use the default `us-east-1`, or type a different region code)
 4.  **Follow Prompts:** The script will then guide you through the rest of the process, asking for:
     *   Domain registration details (domain name, duration, contact info).
+        *   **Important Phone Format:** Ensure the phone number is entered in the format `+<country_code>.<number>` (e.g., `+1.5551234567`).
     *   Confirmation of domain availability.
     *   A service name for the Lightsail container service.
 5.  **Press Enter to Continue:** The script includes several `pause` points after initiating major AWS operations (like domain registration, service creation, image push, deployment). Simply press `ENTER` at these prompts to proceed to the next step.
