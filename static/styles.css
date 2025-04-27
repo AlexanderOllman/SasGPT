@@ -1,18 +1,28 @@
+@import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Poppins:wght@400;600&display=swap');
+
 :root {
-    --primary-color: #334155;
-    --secondary-color: #3b82f6;
-    --accent-color: #06b6d4;
-    --background-color: #f8fafc;
-    --chat-bg: #ffffff;
-    --user-msg-bg: #3b82f6;
-    --bot-msg-bg: #f1f5f9;
-    --user-msg-color: #ffffff;
-    --bot-msg-color: #334155;
-    --border-color: #e2e8f0;
-    --highlight-color: #f59e0b;
-    --code-bg: #1e293b;
-    --shadow-color: rgba(0, 0, 0, 0.05);
+    --primary-color: #ffffff; /* White text */
+    --secondary-color: #ff00a0; /* Bright Pink */
+    --accent-color: #ff00a0; /* Use pink as accent too */
+    --background-color: #000000; /* Black background */
+    --chat-bg: transparent; /* Transparent chat area */
+    --user-msg-bg: transparent; /* Transparent user message */
+    --bot-msg-bg: transparent; /* Transparent bot message */
+    --user-msg-color: #ff00a0; /* White text */
+    --bot-msg-color: #ffffff; /* White text */
+    --border-color: #ff00a0; /* Pink border */
+    --highlight-color: #ff00a0; /* Pink highlight */
+    --code-bg: #1a1a1a; /* Dark grey for code blocks */
+    --shadow-color: rgba(255, 0, 160, 0.3); /* Pink shadow */
     --vh: 1vh;
+
+    /* Hand-drawn border style */
+    --border-width: 4px;
+    --border-style: solid;
+    --border-radius: 15px; /* Adjust for desired roundness */
+    /* --star-color: var(--secondary-color); */ /* Original pink */
+    --star-color-white: #ffffff;
+    --star-color-pink: var(--secondary-color);
 }
 
 * {
@@ -21,41 +31,189 @@
     box-sizing: border-box;
 }
 
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--secondary-color); /* Pink on hover */
+}
+
+
 html, body {
     height: 100%;
     width: 100%;
-    overflow: hidden;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
 }
 
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family: 'Poppins', sans-serif; /* New body font */
     background-color: var(--background-color);
     color: var(--primary-color);
     line-height: 1.6;
     font-size: 16px;
+    overflow: hidden; 
+    /* Add subtle noise overlay */
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
 }
 
 .app-container {
     max-width: 1280px;
-    margin: 0 auto;
-    padding: 1rem;
+    padding: 1.5rem; /* Keep padding */
     display: flex;
     flex-direction: column;
     height: 100%;
     width: 100%;
     overflow: hidden;
+    position: relative; /* Needed for pseudo-elements */
+    z-index: 11; 
+    /* Remove background/blur/shadow */
+    background-color: transparent;
+    backdrop-filter: none;
+    border-radius: 0; /* No rounding for main container */
+    box-shadow: none;
+    margin: 0 auto; /* Center the container */
 }
+
+/* Add some decorative stars - Higher z-index and rearranged */
+.app-container::before, .app-container::after {
+    content: '★';
+    font-family: 'Permanent Marker', cursive; 
+    color: var(--star-color-white);
+    position: absolute;
+    z-index: 10; /* Positive z-index, but behind potential popups */
+    font-size: 2rem; 
+    opacity: 0.8; 
+    pointer-events: none; 
+}
+
+.app-container::before {
+    top: 0.5rem;
+    left: 0.5rem;
+    transform: rotate(-25deg);
+}
+
+.app-container::after {
+    /* Removed this one - too cluttered with others */
+    display: none; 
+}
+
+/* Removed main-content star */
+/*
+.main-content::before {
+   ...
+}
+*/
+
+/* Remove header decals - keep header clean */
+/*
+.header-content::before {
+    ...
+}
+.header-content::after {
+    ...
+}
+*/
+
+/* Repositioned Hollow Heart near Citations Title */
+.citations-container::before {
+    content: '♡'; /* Hollow Heart */
+    color: var(--star-color-white); /* Changed to white */
+    position: absolute;
+    top: 0.5rem; /* Near top border */
+    right: 0.5rem; /* Near right border */
+    font-size: 1.8rem; 
+    opacity: 0.9;
+    transform: rotate(20deg);
+    z-index: 100; /* Bring to front */
+    pointer-events: none;
+}
+
+/* Repositioned star near bottom-right Citations corner */
+.citations-container::after { 
+    content: '☆'; /* Hollow */
+    color: var(--star-color-white);
+    position: absolute;
+    bottom: -0.5rem; /* Overlap bottom */
+    right: -0.5rem; /* Overlap right */
+    font-size: 2rem; 
+    opacity: 0.7; 
+    transform: rotate(10deg);
+    z-index: 100; /* Bring to front */
+    pointer-events: none;
+}
+
+
+.chat-input::after { 
+    content: '♡'; /* Changed to hollow heart */
+    color: var(--star-color-pink);
+    position: absolute;
+    bottom: 0.2rem; /* Align bottom */
+    right: 3.8rem; /* Near send button */
+    font-size: 1.5rem;
+    opacity: 0.8;
+    transform: rotate(15deg);
+    pointer-events: none;
+    z-index: 100; /* Bring to front */
+}
+
+/* Removed inner chat container stars */
+/*
+.chat-container::after {
+    ...
+}
+.chat-container::before {
+    ...
+}
+*/
+
+/* Large Central Heart - Keep behind messages */
+.chat-messages::after { 
+    content: '♡';
+    color: var(--star-color-pink);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(5deg);
+    font-size: 18rem; /* Slightly larger */
+    opacity: 0.06; /* Even lower opacity */
+    z-index: 0; /* Furthest back */
+    pointer-events: none;
+}
+
+/* Small hollow heart near top-left chat */
+.chat-container > .chat-messages::before { 
+    content: '♡'; /* Hollow heart */
+    color: var(--star-color-white);
+    position: absolute;
+    top: -0.8rem; /* Overlapping top */
+    left: 0.8rem; /* Overlapping left */
+    font-size: 1.5rem; 
+    transform: rotate(-25deg);
+    opacity: 0.9;
+    z-index: 100; /* Bring to front */
+    pointer-events: none;
+}
+
+/* Removed star near citation list */
+/*
+.citation-list::before { 
+    ...
+}
+*/
+
+/* Remove main-content decal */
+/*
+.main-content::after { 
+    ...
+}
+*/
 
 header {
     width: 100%;
     padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border-color);
     margin-bottom: 1rem;
+    /* Remove border */
 }
 
 .header-content {
@@ -63,13 +221,46 @@ header {
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 1rem;
+    gap: 0.5rem; /* Reduced gap */
+    position: relative; /* Needed for z-index */
+    z-index: 15; /* Ensure header is above app stars */
 }
 
-h1 {
-    font-size: 1.5rem;
-    font-weight: 700;
+h1.permanent-marker-regular {
+    font-family: 'Permanent Marker', cursive;
+    font-size: 2.5rem; /* Larger title font */
+    font-weight: normal; /* Marker font doesn't need bold */
+    color: var(--secondary-color); /* Pink title */
+    margin: 0;
+    line-height: 1.2;
+}
+
+h2 { /* Style for 'Citations' */
+    font-family: 'Permanent Marker', cursive;
+    font-weight: normal;
+    color: var(--secondary-color);
+    font-size: 1.5rem; /* Adjust size */
+    padding: 1rem 1rem 0.5rem 1rem; /* Adjust padding */
+    margin: 0;
+    text-align: center;
+    border-bottom: none; /* Remove default bottom border */
+}
+
+.subheading.aglc-link {
+    font-size: 0.875rem;
     color: var(--primary-color);
+    text-align: right;
+    flex-grow: 1; /* Push to the right */
+}
+
+.subheading.aglc-link a {
+    color: var(--primary-color);
+    text-decoration-color: var(--secondary-color);
+    text-decoration-thickness: 2px;
+}
+
+.subheading.aglc-link a:hover {
+    color: var(--secondary-color);
 }
 
 .main-content {
@@ -78,102 +269,35 @@ h1 {
     gap: 1.5rem;
     flex-grow: 1;
     overflow: hidden;
-    height: calc(100% - 80px);
+    /* Remove height calc - let flex handle it */
 }
 
-.embedding-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.embedding-toggle span {
-    /* This was for the old "Embedding Type:" label, remove or repurpose */
-    /* font-size: 0.875rem; */
-    /* font-weight: 500; */
-}
-
-.toggle-option {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #64748b; /* Default inactive color */
-    cursor: default;
-    transition: color 0.3s ease;
-}
-
-.toggle-option.active {
-    color: var(--primary-color);
-    font-weight: 600;
-}
-
-/* Toggle Switch Core Styles */
-.toggle {
-    position: relative;
-    display: inline-block;
-    width: 50px; /* Smaller width for just the switch */
-    height: 28px;
-}
-
-.toggle input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #cbd5e1; /* Inactive background */
-    transition: .3s;
-    border-radius: 28px;
-}
-
-.slider:before {
-    position: absolute;
-    content: "";
-    height: 20px;
-    width: 20px;
-    left: 4px;
-    bottom: 4px;
-    background-color: white;
-    transition: .3s;
-    z-index: 2;
-    border-radius: 50%;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-/* Remove internal labels */
-.toggle-label-left,
-.toggle-label-right {
-   display: none;
-}
-
-input:checked + .slider {
-    background-color: var(--secondary-color);
-}
-
-input:checked + .slider:before {
-    transform: translateX(22px); /* Adjust translation for smaller size */
-}
-
-/* Keep these selectors if they existed, but they won't do anything now */
-/* input:checked + .slider .toggle-label-left {}
-input:checked + .slider .toggle-label-right {} */
+/* Remove toggle styles */
+.embedding-toggle, .toggle-option, .toggle, .slider { display: none; }
 
 
 .chat-container {
     display: flex;
     flex-direction: column;
     background-color: var(--chat-bg);
-    border-radius: 0.75rem;
+    border: var(--border-width) var(--border-style) var(--border-color);
+    /* border-radius: var(--border-radius); */
+    border-radius: 18px 10px 20px 12px; /* More varied radius */
     overflow: hidden;
-    box-shadow: 0 4px 6px var(--shadow-color);
+    box-shadow: 0 0 15px var(--shadow-color);
     height: 100%;
-    position: relative;
+    position: relative; /* Needed for inner stars */
+}
+
+/* Stars inside chat area */
+.chat-container::before, .chat-container::after {
+    content: '☆';
+    font-family: 'Permanent Marker', cursive;
+    color: var(--star-color-white);
+    position: absolute;
+    z-index: 1; /* Behind messages */
+    opacity: 0.2; /* Faint */
+    pointer-events: none; /* Don't interfere with clicks */
 }
 
 .chat-messages {
@@ -186,6 +310,8 @@ input:checked + .slider .toggle-label-right {} */
     scrollbar-width: thin;
     scrollbar-color: var(--border-color) transparent;
     -webkit-overflow-scrolling: touch;
+    position: relative; /* Ensure messages stack above background */
+    z-index: 2; /* Ensure messages are above container stars */
 }
 
 .chat-messages::-webkit-scrollbar {
@@ -203,57 +329,105 @@ input:checked + .slider .toggle-label-right {} */
 
 .message {
     max-width: 85%;
-    border-radius: 1rem;
+    /* border-radius: var(--border-radius); */ /* Match container */
+    border-radius: 14px 18px 8px 16px; /* More varied radius */
     padding: 0;
-    overflow: visible; /* Allow content to potentially overflow if absolutely necessary */
-    display: flex; /* Use flexbox to control content alignment */
+    overflow: visible; 
+    display: flex; 
+    border: calc(var(--border-width) / 1.5) var(--border-style) var(--border-color);
+    background-color: transparent;
+    position: relative; /* For potential speech bubble tail */
+}
+
+/* Simple speech bubble tail approximation */
+.bot-message::before {
+    content: '';
+    position: absolute;
+    bottom: -10px; /* Adjust for border */
+    /* left: calc(-1 * var(--border-width) - 8px); Position outside border */
+    width: 0;
+    height: 0;
+    border: 10px solid transparent;
+    border-top-color: var(--border-color); /* Triangle color */
+    border-bottom: 0;
+    border-left: 0;
+    /* margin-bottom: -1px; */ /* Remove margin */
+    filter: drop-shadow(1px 1px 0px rgba(0,0,0,0.2)); /* Optional subtle shadow */
 }
 
 .user-message {
     align-self: flex-end;
-    background-color: var(--user-msg-bg);
+    /* background-color: transparent; */
     color: var(--user-msg-color);
-    border-bottom-right-radius: 0.25rem;
+    border-bottom-right-radius: 5px; /* Sharper corner for effect */
+}
+
+.message.user-message {
+    border: 2px solid #f9f9f9;
+    background-color: #f9f9f9;
+}
+
+.user-message::after {
+    content: '';
+    position: absolute;
+    bottom: -10px; /* Adjust for border */
+    right: calc(-1 * var(--border-width) + 3px);/*Position outside border  */
+    width: 0;
+    height: 0;
+    border: 10px solid transparent;
+    border-top-color: #f9f9f9; /* Triangle color */
+    border-bottom: 0;
+    border-right: 0;
+    /* margin-bottom: -1px; */ /* Remove margin */
+    filter: drop-shadow(-1px 1px 0px rgba(0,0,0,0.2)); /* Optional subtle shadow */
 }
 
 .bot-message {
     align-self: flex-start;
-    background-color: var(--bot-msg-bg);
+    /* background-color: transparent; */
     color: var(--bot-msg-color);
-    border-bottom-left-radius: 0.25rem;
+    border-bottom-left-radius: 5px; /* Sharper corner for effect */
 }
 
 .message-content {
-    padding: 1rem;
+    padding: 0.8rem 1.2rem; /* Adjust padding */
     word-wrap: break-word;
     overflow-wrap: break-word;
     word-break: break-word;
     hyphens: auto;
-    width: 100%; /* Ensure content tries to fit */
+    width: 100%; 
 }
 
 .chat-input {
     display: flex;
     padding: 1rem;
-    background-color: var(--chat-bg);
-    border-top: 1px solid var(--border-color);
+    background-color: transparent;
+    border-top: var(--border-width) var(--border-style) var(--border-color);
     position: relative;
     z-index: 10;
 }
 
 .chat-input input {
     flex: 1;
-    padding: 0.875rem 1.25rem;
-    border: 1px solid var(--border-color);
-    border-radius: 1.5rem;
+    padding: 0.75rem 1.25rem; /* Adjust padding */
+    border: var(--border-width) var(--border-style) var(--border-color);
+    /* border-radius: 25px; */ /* More rounded input */
+    border-radius: 28px 18px 22px 30px; /* More varied radius */
     outline: none;
     font-size: 1rem;
     transition: border 0.3s ease;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Poppins', sans-serif; /* Use body font */
+    background-color: transparent;
+    color: var(--primary-color);
 }
 
 .chat-input input:focus {
     border-color: var(--secondary-color);
+    box-shadow: 0 0 10px var(--shadow-color);
+}
+
+.chat-input input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
 }
 
 .send-button {
@@ -262,81 +436,75 @@ input:checked + .slider .toggle-label-right {} */
     justify-content: center;
     background-color: var(--secondary-color);
     color: white;
-    border: none;
-    width: 40px;
-    height: 40px;
+    border: var(--border-width) var(--border-style) #fff; /* White border on button */
+    width: 50px; /* Larger button */
+    height: 50px; /* Larger button */
     border-radius: 50%;
     margin-left: 0.75rem;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    transition: all 0.3s ease;
+    margin-top: 0; /* Reset margin */
+    box-shadow: 0 0 10px var(--shadow-color);
 }
 
 .send-button:hover {
-    background-color: #2563eb;
+    background-color: #fff; /* White background on hover */
+    color: var(--secondary-color); /* Pink icon on hover */
+    transform: scale(1.1);
 }
 
 .send-button svg {
-    width: 18px;
-    height: 18px;
+    width: 20px; /* Adjust icon size */
+    height: 20px;
 }
 
 .citations-container {
     background-color: var(--chat-bg);
-    border-radius: 0.75rem;
+    /* border-radius: var(--border-radius); */
+    border-radius: 10px 18px 16px 20px; /* More varied radius */
     overflow: hidden;
-    box-shadow: 0 4px 6px var(--shadow-color);
+    box-shadow: 0 0 15px var(--shadow-color);
     display: flex;
     flex-direction: column;
     height: 100%;
+    border: var(--border-width) var(--border-style) var(--border-color);
+    position: relative; /* Needed for inner star */
 }
 
 .citations-container h2 {
-    padding: 1rem;
-    background-color: var(--primary-color);
-    color: white;
-    margin: 0;
-    font-size: 1.125rem;
-    font-weight: 600;
+    /* Styles already set above */
+    border-bottom: var(--border-width) var(--border-style) var(--border-color);
 }
 
 .citation-list {
     flex: 1;
     overflow-y: auto;
     padding: 1rem;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-color) transparent;
-    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Hide scrollbar */
+    background-color: var(--background-color); /* Black list bg */
 }
+.citation-list::-webkit-scrollbar { display: none; } /* Hide scrollbar */
 
-.citation-list::-webkit-scrollbar {
-    width: 6px;
-}
-
-.citation-list::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.citation-list::-webkit-scrollbar-thumb {
-    background-color: var(--border-color);
-    border-radius: 6px;
-}
 
 .citation-item {
-    border: 1px solid var(--border-color);
-    border-radius: 0.5rem;
+    border: calc(var(--border-width) / 1.5) var(--border-style) var(--border-color);
+    /* border-radius: 10px; */ /* Slightly less rounded */
+    border-radius: 10px 14px 6px 11px; /* More varied radius */
     padding: 1rem;
     margin-bottom: 1rem;
     transition: background-color 0.3s ease, transform 0.2s ease;
+    background-color: transparent;
 }
 
 .citation-item:hover {
-    box-shadow: 0 2px 4px var(--shadow-color);
+    box-shadow: 0 0 8px var(--shadow-color);
     transform: translateY(-2px);
+    background-color: rgba(255, 0, 160, 0.1); /* Subtle pink glow on hover */
 }
 
 .citation-page {
     font-weight: 600;
-    color: var(--secondary-color);
+    color: var(--secondary-color); /* Pink page number */
     margin-bottom: 0.5rem;
 }
 
@@ -344,6 +512,7 @@ input:checked + .slider .toggle-label-right {} */
     font-size: 0.875rem;
     margin-bottom: 0.75rem;
     line-height: 1.5;
+    color: var(--primary-color);
 }
 
 .citation-link {
@@ -351,34 +520,36 @@ input:checked + .slider .toggle-label-right {} */
     background-color: var(--secondary-color);
     color: white;
     padding: 0.375rem 0.75rem;
-    border-radius: 0.25rem;
+    border-radius: 5px;
     text-decoration: none;
     font-size: 0.75rem;
     font-weight: 600;
     transition: background-color 0.3s ease;
+    border: 1px solid white;
 }
 
 .citation-link:hover {
-    background-color: #2563eb;
+    background-color: white;
+    color: var(--secondary-color);
 }
 
 .citation-ref {
     color: var(--secondary-color);
     font-weight: 600;
-    text-decoration: none;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
     transition: color 0.3s ease;
     cursor: pointer;
 }
 
 .citation-ref:hover {
-    color: #2563eb;
-    text-decoration: underline;
+    color: white; 
 }
 
 /* Cost display */
 .cost-info {
     font-size: 0.75rem;
-    color: #94a3b8;
+    color: #a1a1aa; /* Light grey */
     margin-top: 0.5rem;
     text-align: right;
 }
@@ -394,23 +565,13 @@ input:checked + .slider .toggle-label-right {} */
     width: 8px;
     height: 8px;
     margin: 0 4px;
-    background-color: var(--secondary-color);
+    background-color: var(--secondary-color); /* Pink dots */
     border-radius: 50%;
     animation: bounce 1.5s infinite ease-in-out;
+    box-shadow: 0 0 8px var(--secondary-color); 
 }
 
-.dot:nth-child(1) {
-    animation-delay: 0s;
-}
-
-.dot:nth-child(2) {
-    animation-delay: 0.2s;
-}
-
-.dot:nth-child(3) {
-    animation-delay: 0.4s;
-}
-
+/* Add back the keyframes for the loading animation */
 @keyframes bounce {
     0%, 80%, 100% {
         transform: scale(0);
@@ -422,281 +583,338 @@ input:checked + .slider .toggle-label-right {} */
     }
 }
 
-/* Markdown styling */
-.message-content h1,
-.message-content h2,
-.message-content h3,
-.message-content h4 {
-    margin-top: 1em;
-    margin-bottom: 0.5em;
-    font-weight: 600;
+/* Remove old font classes if they exist */
+.dela-gothic-one-regular, .crimson-text-regular, .crimson-text-semibold, 
+.crimson-text-bold, .crimson-text-regular-italic, .crimson-text-semibold-italic, 
+.crimson-text-bold-italic {
+    font-family: inherit; /* Reset to body font */
+    font-weight: inherit;
+    font-style: inherit;
 }
 
-.message-content h1 {
-    font-size: 1.5em;
+/* Remove Animated Background Styles */
+/*
+.gradient-background, .gradient-sphere, .sphere-1, .sphere-2, .sphere-3, 
+.noise-overlay, @keyframes float-1, @keyframes float-2, @keyframes float-3, 
+.grid-overlay, .glow, @keyframes pulse, .particles-container, .particle {
+    display: none;
 }
+*/
 
-.message-content h2 {
-    font-size: 1.25em;
-}
-
-.message-content h3 {
-    font-size: 1.125em;
-}
-
-.message-content p {
-    margin-bottom: 1em;
-}
-
-.message-content ul,
-.message-content ol {
-    margin-bottom: 1em;
-    margin-left: 1.5em;
-}
-
-.message-content li {
-    margin-bottom: 0.25em;
-}
-
-.message-content pre {
-    background-color: var(--code-bg);
-    border-radius: 0.375rem;
-    padding: 0.75rem;
-    overflow-x: auto;
-    margin: 0.5em 0;
-}
-
-.message-content code {
-    font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
-    font-size: 0.875em;
-    padding: 0.2em 0.4em;
-    border-radius: 0.25em;
-    background-color: rgba(0, 0, 0, 0.05);
-}
-
-.message-content pre code {
-    padding: 0;
-    background-color: transparent;
-    color: #e2e8f0;
-}
-
-.message-content blockquote {
-    border-left: 4px solid var(--secondary-color);
-    padding-left: 1em;
-    margin-left: 0;
-    margin-right: 0;
-    font-style: italic;
-}
-
-.message-content table {
-    border-collapse: collapse;
-    width: 100%;
-    margin-bottom: 1em;
-}
-
-.message-content th,
-.message-content td {
-    padding: 0.5em;
-    border: 1px solid var(--border-color);
-}
-
-.message-content th {
-    background-color: #f8fafc;
-    font-weight: 600;
-}
-
-/* Hamburger Menu */
-.hamburger-menu {
-    display: none; /* Hidden by default */
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0.5rem;
-}
-
-.hamburger-menu svg {
-    width: 28px;
-    height: 28px;
-    color: var(--primary-color);
-}
-
-/* Settings Sidebar */
-.settings-sidebar {
-    position: fixed;
-    top: 0;
-    right: -300px; /* Start off-screen */
-    width: 280px;
-    height: 100%;
-    background-color: var(--chat-bg);
-    box-shadow: -4px 0 10px rgba(0, 0, 0, 0.1);
-    z-index: 1001;
-    transition: right 0.3s ease-in-out;
-    padding: 1.5rem;
-    overflow-y: auto;
-}
-
-.settings-sidebar.open {
-    right: 0;
-}
-
-.close-sidebar {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    font-size: 2rem;
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--primary-color);
-}
-
-.settings-sidebar h2 {
-    margin-bottom: 1.5rem;
-    font-size: 1.25rem;
-    color: var(--primary-color);
-}
-
-.setting-item {
-    margin-bottom: 1rem;
-}
-
-.setting-item .setting-label {
-    display: block;
-    font-weight: 500;
-    margin-bottom: 0.75rem;
-}
-
-.setting-item .embedding-toggle.mobile-toggle {
-    justify-content: flex-start; /* Align items to the start */
-}
-
-.sidebar-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.4);
-    z-index: 1000;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
-}
-
-.sidebar-overlay.open {
-    opacity: 1;
-    visibility: visible;
-}
-
-
-/* Responsive design */
+/* Responsive: Stack columns and adjust padding/borders */
 @media screen and (max-width: 768px) {
-    .main-content {
-        display: flex;
-        flex-direction: column;
-        height: calc(100% - 110px);
-        overflow: hidden;
+    .app-container {
+        padding: 0.5rem;
     }
-    
-    .chat-container {
-        flex: 1;
-        min-height: 0;
-        height: auto;
-        margin-bottom: 0.75rem;
+    .main-content {
+        grid-template-columns: 1fr; /* Stack columns */
+        height: calc(100% - 70px); /* Adjust height */
+        gap: 1rem;
     }
     
     .citations-container {
-        display: none; /* Hide citations container on mobile by default */
+        display: flex; /* Show citations on mobile */
+        max-height: 30vh; /* Limit height */
+    }
+
+    h1.permanent-marker-regular {
+        font-size: 1.8rem;
     }
     
     .header-content {
-        flex-direction: row; /* Keep row layout for header */
-        align-items: center;
-        justify-content: space-between;
+        justify-content: center; /* Center header items */
+        text-align: center;
+    }
+    .subheading.aglc-link {
+        text-align: center;
+        width: 100%;
+        margin-top: 0.5rem;
     }
     
-    .embedding-toggle.desktop-only {
-        display: none; /* Hide desktop toggle */
+    /* Reduce border thickness slightly on mobile */
+    :root {
+        --border-width: 3px;
+        --border-radius: 10px;
     }
-    
-    .hamburger-menu {
-        display: block; /* Show hamburger */
-    }
-    
-    .message {
-        max-width: 90%;
-    }
-    
-    h1 {
-        font-size: 1.25rem;
-    }
-    
-    .app-container {
-        padding: 0.75rem;
+    .send-button {
+        width: 45px;
+        height: 45px;
     }
 }
 
-/* iPhone specific */
-@media screen and (max-width: 480px) {
-    .app-container {
-        padding: 0.5rem;
-        height: 100%;
-        height: calc(var(--vh, 1vh) * 100);
-    }
-    
-    .main-content {
-        gap: 0.5rem;
-        height: calc(100% - 110px);
-    }
-    
-    .chat-messages {
-        padding: 0.75rem;
-    }
-    
-    .message-content {
-        padding: 0.75rem;
-        overflow-wrap: break-word;
-        word-break: break-word;
-        max-width: 100%;
-    }
-    
-    .chat-input {
-        padding: 0.75rem;
-    }
-    
-    .chat-input input {
-        padding: 0.625rem 1rem;
-    }
-    
-    .send-button {
-        width: 36px;
-        height: 36px;
-        min-width: 36px;
-    }
-    
-    .citation-item {
-        padding: 0.75rem;
-    }
-    
-    .message {
-        max-width: 95%;
-    }
-    
-    /* Adjust markup elements sizing for mobile */
-    .message-content h1 {
-        font-size: 1.3em;
-    }
-    
-    .message-content h2 {
-        font-size: 1.2em;
-    }
-    
-    .message-content h3 {
-        font-size: 1.1em;
-    }
-    
-    .message-content pre {
-        max-width: 100%;
-        overflow-x: auto;
-    }
+/* Hide Settings Sidebar stuff */
+.settings-sidebar, .sidebar-overlay {
+    display: none;
+}
+
+/* New Permanent Marker class */
+.permanent-marker-regular {
+  font-family: "Permanent Marker", cursive;
+  font-weight: 400; 
+  font-style: normal;
+} 
+
+/* Style for the new details/summary elements */
+.citation-history-item {
+    border: var(--border-width) var(--border-style) var(--border-color);
+    border-radius: var(--border-radius);
+    margin-bottom: 1rem;
+    background-color: var(--background-color); /* Black background */
+}
+
+.citation-history-item summary {
+    background-color: var(--primary-color); /* White background */
+    color: var(--secondary-color); /* Pink text */
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    border-radius: calc(var(--border-radius) - var(--border-width)); /* Match outer radius */
+    border: 1px solid var(--secondary-color); /* Thin pink border inside */
+    transition: background-color 0.2s ease;
+    position: relative; /* For marker */
+}
+
+.citation-history-item summary:hover {
+    background-color: #f0f0f0; /* Slightly off-white hover */
+}
+
+/* Style the dropdown arrow */
+.citation-history-item summary::marker,
+.citation-history-item summary::-webkit-details-marker {
+    color: var(--secondary-color); /* Pink arrow */
+    font-size: 1.2em;
+}
+
+.citation-history-item[open] summary {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom: 1px dashed var(--secondary-color);
+}
+
+.citations-content {
+    padding: 1rem;
+    border-top: none; /* Remove top border if summary border provides separation */
+}
+
+/* Adjust citation item within dropdown */
+.citations-content .citation-item {
+    margin-bottom: 0.75rem;
+    border-width: calc(var(--border-width) / 2 ); /* Thinner border inside */
+    border-radius: 8px; /* Slightly smaller radius */
+}
+
+/* Add/Adjust more decals */
+.main-content::after { /* New hollow star */
+    content: '♡'; 
+    color: var(--star-color-white);
+    position: absolute;
+    bottom: 1rem;
+    left: 40%; 
+    font-size: 3rem;
+    transform: rotate(-15deg);
+    opacity: 0.3;
+    z-index: 9;
+    pointer-events: none;
+}
+
+/* Add more stars/decals */
+/* Remove line pseudo-element */
+/*
+.chat-container > .chat-messages::after { 
+    content: '—'; 
+    color: var(--star-color-pink);
+    position: absolute;
+    bottom: -0.5rem;
+    left: 15%;
+    font-size: 2.5rem;
+    font-weight: bold;
+    transform: rotate(5deg);
+    opacity: 0.6;
+    z-index: 12;
+    pointer-events: none;
+}
+*/
+
+/* Add more stars/decals */
+.chat-container > .chat-messages::before { /* Existing hollow heart - reposition */
+    content: '♡'; /* Hollow heart */
+    color: var(--star-color-white);
+    position: absolute;
+    top: 15rem; /* Overlapping top */
+    left: 5%; /* Moved left */
+    font-size: 1.8rem; /* Slightly smaller */
+    transform: rotate(-18deg);
+    opacity: 0.5;
+    z-index: 12; 
+    pointer-events: none;
+}
+
+.message.bot-message::after { /* New star near bot message */
+    content: '★'; 
+    color: var(--star-color-white);
+    position: absolute;
+    top: 5.5rem;
+    right: -2.5rem;
+    font-size: 1.2rem;
+    transform: rotate(20deg);
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.citation-list::before { /* New hollow star in citation list */
+    content: '★'; 
+    color: var(--star-color-pink);
+    position: absolute;
+    bottom: 1rem;
+    right: 1rem;
+    font-size: 2.2rem;
+    transform: rotate(20deg);
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 1; /* Behind items */
+}
+
+/* Central White Star - Behind Messages */
+.chat-messages::before { 
+    content: '★';
+    color: var(--star-color-white);
+    position: absolute;
+    top: 45%; /* Adjusted position */
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-10deg);
+    font-size: 25rem; /* Much Larger */
+    opacity: 0.15; /* Brighter opacity */
+    z-index: 0; /* Behind messages and central heart */
+    pointer-events: none;
+}
+
+/* Large Central Pink Heart - Behind Messages */
+.chat-messages::after { 
+    content: '♡';
+    color: var(--star-color-pink);
+    position: absolute;
+    top: 55%; /* Adjusted position */
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(5deg);
+    font-size: 22rem; /* Much Larger */
+    opacity: 0.12; /* Brighter opacity */
+    z-index: 0; /* Furthest back */
+    pointer-events: none;
+}
+
+/* LOTS MORE DECALS */
+
+/* --- App Container Area --- */
+.app-container > header::before {
+    content: '☆';
+    color: var(--star-color-pink);
+    position: absolute;
+    top: 28rem;
+    left: 2rem;
+    font-size: 2.5rem;
+    transform: rotate(15deg);
+    opacity: 0.6;
+    z-index: 10;
+    pointer-events: none;
+}
+.app-container > header::after {
+    content: '♡';
+    color: var(--star-color-pink);
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    font-size: 3rem;
+    transform: rotate(-10deg);
+    opacity: 0.5;
+    z-index: 10;
+    pointer-events: none;
+}
+
+/* --- Chat Container Area --- */
+.chat-container > .chat-messages::before { 
+    /* Was small white heart near top-left, repurposed for central star above */
+    /* Keep selector for potential future use or remove if confirmed */
+    display: none; 
+}
+
+
+.chat-container::before { /* Pink star near top right */
+    content: '☆';
+    color: var(--star-color-pink);
+    position: absolute;
+    top: -0.2rem;
+    right: 1.5rem;
+    font-size: 2.8rem;
+    transform: rotate(25deg);
+    z-index: 10;
+    opacity: 0.8;
+    pointer-events: none;
+}
+
+/* --- Citations Container Area --- */
+.citations-container::before { /* White Hollow Heart top right */
+    content: '♡'; 
+    color: var(--star-color-white);
+    position: absolute;
+    top: 0.8rem; 
+    right: 1.5rem; 
+    font-size: 2rem; 
+    opacity: 0.9;
+    transform: rotate(20deg);
+    z-index: 100; /* Above others */
+    pointer-events: none;
+}
+.citations-container::after { /* White Hollow star bottom right */
+    content: '☆'; 
+    color: var(--star-color-white);
+    position: absolute;
+    bottom: 8.5rem;
+    right: 3.5rem;
+    font-size: 8rem;
+    opacity: 0.3;
+    z-index: 100; /* Bring to front */
+    pointer-events: none;
+}
+
+/* Add one more for citations */
+.citations-container > .citation-list::after {
+    content: '♡';
+    color: var(--star-color-white);
+    position: absolute;
+    bottom: -0.5rem;
+    left: 1rem;
+    font-size: 2.5rem;
+    transform: rotate(-15deg);
+    opacity: 0.6;
+    z-index: 10;
+    pointer-events: none;
+}
+
+/* --- Chat Input Area --- */
+.chat-input::after { /* Pink Hollow heart near button */
+    content: '♡'; 
+    color: var(--star-color-pink);
+    position: absolute;
+    bottom: 7.2rem;
+    right: 3.8rem;
+    font-size: 1.5rem;
+    opacity: 0.8;
+    transform: rotate(15deg);
+    z-index: 100; /* Bring to front */
+    pointer-events: none;
+}
+
+/* Add one more for input */
+.chat-input > input::before {
+    content: '★'; /* Solid pink star */
+    color: var(--star-color-pink);
+    position: absolute;
+    top: -1rem;
+    left: 40%;
+    font-size: 1.5rem;
+    transform: rotate(10deg);
+    opacity: 0.7;
+    z-index: 10;
+    pointer-events: none;
 } 

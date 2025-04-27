@@ -5,15 +5,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const citationList = document.getElementById('citation-list');
     const embeddingToggleDesktop = document.getElementById('embedding-toggle-desktop');
     const embeddingToggleMobile = document.getElementById('embedding-toggle-mobile');
-    const hamburgerMenu = document.getElementById('hamburger-menu');
-    const settingsSidebar = document.getElementById('settings-sidebar');
-    const closeSidebar = document.getElementById('close-sidebar');
-    const sidebarOverlay = document.getElementById('sidebar-overlay');
     const desktopToggleOptions = document.querySelectorAll('.embedding-toggle.desktop-only .toggle-option');
     const mobileToggleOptions = document.querySelectorAll('.embedding-toggle.mobile-toggle .toggle-option');
     
     let chatHistory = [];
+    let qaCitationHistory = []; // New array to store Q&A with citations
     let currentEmbeddingType = "openai"; // Default to OpenAI
+    
+    // Configure marked AFTER DOM content is loaded and hljs should be available
+    if (typeof marked !== 'undefined' && typeof hljs !== 'undefined') {
+        marked.setOptions({
+            highlight: function(code, lang) {
+                try {
+                    // Explicitly check if language is supported, otherwise use auto-highlight
+                    const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+                    return hljs.highlight(code, { language, ignoreIllegals: true }).value;
+                } catch (e) {
+                    console.error("Highlight.js error during highlight:", e);
+                    return code; // Return original code on error
+                }
+            },
+            breaks: true,
+            gfm: true // Enable GitHub Flavored Markdown
+        });
+    } else {
+        console.warn("Marked or Highlight.js not loaded correctly.");
+        // Provide basic fallback if marked exists but hljs doesn't
+        if (typeof marked !== 'undefined') {
+             marked.setOptions({ breaks: true, gfm: true });
+        }
+    }
     
     // Fix iOS height issues with vh units
     function setMobileHeight() {
@@ -164,30 +185,49 @@ document.addEventListener('DOMContentLoaded', () => {
         return processedText;
     }
     
-    // Function to display citations
-    function displayCitations(citations) {
-        citationList.innerHTML = '';
-        
-        if (!citations || citations.length === 0) {
+    // New function to render citation history as dropdowns
+    function renderCitationHistory(history) {
+        citationList.innerHTML = ''; // Clear previous static content
+
+        if (!history || history.length === 0) {
             const noCitationsDiv = document.createElement('div');
-            noCitationsDiv.className = 'citation-item';
-            noCitationsDiv.textContent = 'No citations available for this response.';
+            noCitationsDiv.className = 'citation-item no-history'; // Add class for styling
+            noCitationsDiv.textContent = 'Ask a question to see relevant citations.';
             citationList.appendChild(noCitationsDiv);
             return;
         }
-        
-        citations.forEach((citation, index) => {
-            const citationDiv = document.createElement('div');
-            citationDiv.className = 'citation-item';
-            citationDiv.id = citation.id;
-            
-            citationDiv.innerHTML = `
-                <div class="citation-page">Page ${citation.page}</div>
-                <div class="citation-text">${citation.text.substring(0, 150)}${citation.text.length > 150 ? '...' : ''}</div>
-                <a href="${citation.url}" class="citation-link" target="_blank">View in PDF</a>
-            `;
-            
-            citationList.appendChild(citationDiv);
+
+        history.forEach((item, index) => {
+            if (!item.citations || item.citations.length === 0) return; // Skip if no citations for this Q&A
+
+            const detailsElement = document.createElement('details');
+            detailsElement.className = 'citation-history-item';
+            detailsElement.open = index === history.length - 1; // Open the last item by default
+
+            const summaryElement = document.createElement('summary');
+            // Use first ~10 words of the question as summary
+            const summaryText = item.question.split(' ').slice(0, 10).join(' ') + (item.question.split(' ').length > 10 ? '...' : '');
+            summaryElement.textContent = summaryText;
+            detailsElement.appendChild(summaryElement);
+
+            const citationsContainerDiv = document.createElement('div');
+            citationsContainerDiv.className = 'citations-content';
+
+            item.citations.forEach(citation => {
+                const citationDiv = document.createElement('div');
+                citationDiv.className = 'citation-item'; // Reuse existing class
+                citationDiv.id = citation.id; // Keep ID for potential linking
+                
+                citationDiv.innerHTML = `
+                    <div class="citation-page">Page ${citation.page}</div>
+                    <div class="citation-text">${citation.text.substring(0, 150)}${citation.text.length > 150 ? '...' : ''}</div>
+                    <a href="${citation.url}" class="citation-link" target="_blank">View in PDF</a>
+                `;
+                citationsContainerDiv.appendChild(citationDiv);
+            });
+
+            detailsElement.appendChild(citationsContainerDiv);
+            citationList.appendChild(detailsElement);
         });
     }
 
@@ -325,8 +365,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add bot message with Markdown and citation links
             addMessage(processedAnswer, false, data.embedding_type, data.cost);
             
-            // Display citations
-            displayCitations(data.citations);
+            // Store Q&A and citations together
+            qaCitationHistory.push({
+                question: message, 
+                answer: data.answer, // Storing answer might be useful later
+                citations: data.citations
+            });
+
+            // Render the updated citation history
+            renderCitationHistory(qaCitationHistory);
             
             // Scroll to bottom
             chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -349,27 +396,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Add event listener for embedding toggles
-    embeddingToggleDesktop.addEventListener('change', () => updateEmbeddingType(embeddingToggleDesktop));
-    embeddingToggleMobile.addEventListener('change', () => updateEmbeddingType(embeddingToggleMobile));
+    // embeddingToggleDesktop.addEventListener('change', () => updateEmbeddingType(embeddingToggleDesktop));
+    // embeddingToggleMobile.addEventListener('change', () => updateEmbeddingType(embeddingToggleMobile));
     
     // Add event listener for form submission
     chatForm.addEventListener('submit', handleSubmit);
 
-    // --- Hamburger Menu Logic ---
-    function openSidebar() {
-        settingsSidebar.classList.add('open');
-        sidebarOverlay.classList.add('open');
-    }
-
-    function closeSidebarFunc() {
-        settingsSidebar.classList.remove('open');
-        sidebarOverlay.classList.remove('open');
-    }
-
-    hamburgerMenu.addEventListener('click', openSidebar);
-    closeSidebar.addEventListener('click', closeSidebarFunc);
-    sidebarOverlay.addEventListener('click', closeSidebarFunc);
-    
     // Fix for mobile keyboard issues
     userInput.addEventListener('focus', () => {
         // On mobile, scroll the page after a small delay to keep input in view
@@ -404,8 +436,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Initial rendering of citation list (will show the placeholder)
+    renderCitationHistory(qaCitationHistory);
+
     // Initial sync of toggles and labels to the default state
-    embeddingToggleDesktop.checked = currentEmbeddingType === "openai";
-    embeddingToggleMobile.checked = currentEmbeddingType === "openai";
-    updateToggleLabels(currentEmbeddingType);
-}); 
+    // embeddingToggleDesktop.checked = currentEmbeddingType === "openai";
+    // embeddingToggleMobile.checked = currentEmbeddingType === "openai";
+    // updateToggleLabels(currentEmbeddingType);
+});
+
+// Particle effect code removed. 

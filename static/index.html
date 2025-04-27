@@ -3,27 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AGLC RAG Chatbot</title>
+    <title>SasGPT - One Citation at a Time</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/styles/atom-one-dark.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <!-- Favicon Links -->
+    <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon/favicon-16x16.png">
+    <link rel="manifest" href="favicon/site.webmanifest">
+    <link rel="shortcut icon" href="favicon/favicon.ico">
+    <!-- End Favicon Links -->
 </head>
 <body>
     <div class="app-container">
         <header>
             <div class="header-content">
-                <h1>AGLC RAG Chatbot</h1>
-                <!-- Hamburger menu for mobile -->
-                <button class="hamburger-menu" id="hamburger-menu" aria-label="Toggle settings menu">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="3" y1="12" x2="21" y2="12"></line>
-                        <line x1="3" y1="6" x2="21" y2="6"></line>
-                        <line x1="3" y1="18" x2="21" y2="18"></line>
-                    </svg>
-                </button>
+                <h1 class="permanent-marker-regular">SasGPT</h1>
+                <p class="subheading aglc-link">
+                    <a href="https://law.unimelb.edu.au/__data/assets/pdf_file/0005/3181325/AGLC4-with-Bookmarks-1.pdf" target="_blank">
+                        View the AGLC (Fourth Edition)
+                    </a>
+                </p>
                 <!-- Embedding toggle for desktop -->
+                <!--
                 <div class="embedding-toggle desktop-only">
                     <span class="toggle-option" data-value="tfidf">TF-IDF</span>
                     <label class="toggle">
@@ -32,6 +37,7 @@
                     </label>
                     <span class="toggle-option active" data-value="openai">OpenAI</span>
                 </div>
+                -->
             </div>
         </header>
 
@@ -41,6 +47,7 @@
             <h2>Settings</h2>
             <div class="setting-item">
                 <label class="setting-label">Embedding Type:</label>
+                <!--
                 <div class="embedding-toggle mobile-toggle">
                      <span class="toggle-option" data-value="tfidf">TF-IDF</span>
                      <label class="toggle">
@@ -49,6 +56,7 @@
                      </label>
                      <span class="toggle-option active" data-value="openai">OpenAI</span>
                 </div>
+                -->
             </div>
             <!-- Add more settings here if needed -->
         </div>
@@ -60,7 +68,7 @@
                 <div class="chat-messages" id="chat-messages">
                     <div class="message bot-message">
                         <div class="message-content">
-                            Hello! I'm the AGLC RAG Chatbot. I can help you with questions about the Australian Guide to Legal Citation. Ask me anything about AGLC!
+                            Hi there, I'm Sas! I can help you find relevant stuff within the Australian Guide to Legal Citation (Fourth Edition). Although, you would probably already know this stuff if you bothered to study it.
                         </div>
                     </div>
                 </div>
@@ -91,15 +99,6 @@
     <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/lib/core.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/lib/languages/xml.min.js"></script>
-    <script>
-        // Configure marked options
-        marked.setOptions({
-            highlight: function(code, lang) {
-                return hljs.highlightAuto(code).value;
-            },
-            breaks: true
-        });
-    </script>
     <script src="script.js"></script>
 </body>
 </html> 
