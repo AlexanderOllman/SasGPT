@@ -429,25 +429,61 @@ while true; do
       case "${SERVICE_ACTION,,}" in
         d|delete)
           echo "Attempting to delete existing service '${SERVICE_NAME}'..."
+          # Don't exit on error for the delete command itself, check code
+          set +e
           DELETE_OUTPUT=$(aws lightsail delete-container-service --service-name "$SERVICE_NAME" 2>&1)
           DELETE_EXIT_CODE=$?
+          set -e
+
           if [[ $DELETE_EXIT_CODE -eq 0 ]]; then
-            echo "✓ Existing service '${SERVICE_NAME}' deleted. Will retry creation."
-            # Brief pause might be needed for deletion to fully register
-            echo "Pausing briefly before retrying creation..."
-            sleep 5
-            continue # Loop back to try creating again with the same name
-          else
-            echo "❌ Failed to delete existing service '${SERVICE_NAME}': $DELETE_OUTPUT" >&2
-            echo "Please resolve manually or choose a different name." >&2
-            # Fall through to prompt for rename/quit
-            read -rp "(R)ename service, or (Q)uit? [R]: " RENAME_QUIT_ACTION
-            RENAME_QUIT_ACTION=${RENAME_QUIT_ACTION:-R}
-            if [[ "${RENAME_QUIT_ACTION,,}" == "q" ]]; then
-               echo "Exiting script." >&2; exit 1;
+            echo "✓ Delete command issued for service '${SERVICE_NAME}'. Now monitoring deletion status..."
+            # --- Monitoring Loop --- >
+            MAX_WAIT_SECONDS=300 # Wait up to 5 minutes
+            CHECK_INTERVAL_SECONDS=20
+            SECONDS_WAITED=0
+            DELETED=false
+            while [[ $SECONDS_WAITED -lt $MAX_WAIT_SECONDS ]]; do
+              echo "  (Waited ${SECONDS_WAITED}s / ${MAX_WAIT_SECONDS}s) Checking if service '${SERVICE_NAME}' is deleted..."
+              set +e # Don't exit if get-container-service fails (means it's deleted)
+              aws lightsail get-container-service --service-name "$SERVICE_NAME" > /dev/null 2>&1
+              GET_EXIT_CODE=$?
+              set -e
+
+              if [[ $GET_EXIT_CODE -ne 0 ]]; then
+                # Command failed, likely because the service is gone
+                echo "✓ Service '${SERVICE_NAME}' appears to be deleted."
+                DELETED=true
+                break
+              fi
+              # If command succeeded, service still exists (likely DELETING)
+              echo "  Service still exists. Waiting ${CHECK_INTERVAL_SECONDS}s before checking again..."
+              sleep $CHECK_INTERVAL_SECONDS
+              SECONDS_WAITED=$((SECONDS_WAITED + CHECK_INTERVAL_SECONDS))
+            done
+            # --- End Monitoring Loop ---
+
+            if [[ "$DELETED" == true ]]; then
+              echo "✓ Deletion confirmed. Proceeding to recreate service."
+              continue # Loop back to the outer loop to try creating again
+            else
+              echo "❌ Service '${SERVICE_NAME}' was not confirmed deleted after ${MAX_WAIT_SECONDS} seconds." >&2
+              echo "Please check the AWS Lightsail console manually." >&2
+              # Fall through to prompt for rename/quit after timeout
             fi
-            # Intentional fallthrough to rename logic below
+
+          else
+            echo "❌ Failed to issue delete command for service '${SERVICE_NAME}': $DELETE_OUTPUT" >&2
+            # Fall through to prompt for rename/quit if delete failed
           fi
+
+          # --- Fallthrough for failed delete or timeout ---
+          echo "Cannot proceed with deletion/recreation." >&2
+          read -rp "(R)ename service, or (Q)uit? [R]: " RENAME_QUIT_ACTION
+          RENAME_QUIT_ACTION=${RENAME_QUIT_ACTION:-R}
+          if [[ "${RENAME_QUIT_ACTION,,}" == "q" ]]; then
+             echo "Exiting script." >&2; exit 1;
+          fi
+          # Intentional fallthrough to rename logic below if R is chosen
           ;;
         q|quit)
           echo "Exiting script as requested." >&2
