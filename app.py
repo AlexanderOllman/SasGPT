@@ -15,9 +15,6 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 import logging
 
-# Import our simple TF-IDF implementation
-from simple_embeddings import SimpleTfidfEmbeddings
-
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
