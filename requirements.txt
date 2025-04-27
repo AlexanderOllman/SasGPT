@@ -11,6 +11,4 @@ faiss-cpu
 pypdf
 tiktoken
 python-multipart
-scikit-learn
-numpy
 pycryptodome

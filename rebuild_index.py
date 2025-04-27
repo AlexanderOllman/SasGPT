@@ -5,7 +5,7 @@ Script to completely rebuild the FAISS index from scratch
 import os
 import shutil
 import logging
-from initialize_db import initialize_vector_db
+from initialize_openai_db import initialize_openai_vector_db
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, 

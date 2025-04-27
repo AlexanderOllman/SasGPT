@@ -65,9 +65,7 @@ class EmbeddingToggleResponse(BaseModel):
 PDF_URL = "https://law.unimelb.edu.au/__data/assets/pdf_file/0005/3181325/AGLC4-with-Bookmarks-1.pdf"
 
 # Initialize vector database and LLM
-tfidf_embeddings = None
 openai_embeddings = None
-tfidf_vector_db = None
 openai_vector_db = None
 llm = None
 current_embedding_type = "openai"  # Default to OpenAI
@@ -89,18 +87,6 @@ def calculate_cost(token_count, model="gpt-4o-mini", is_input=True):
     
     return (token_count / 1000) * rate
 
-def get_tfidf_embeddings():
-    global tfidf_embeddings
-    if tfidf_embeddings is None:
-        try:
-            logger.info("Initializing SimpleTfidfEmbeddings...")
-            tfidf_embeddings = SimpleTfidfEmbeddings(max_features=384)  # Match dimensions with OpenAI
-            logger.info("TF-IDF Embeddings initialized successfully")
-        except Exception as e:
-            logger.error(f"Error initializing TF-IDF embeddings: {e}")
-            raise
-    return tfidf_embeddings
-
 def get_openai_embeddings():
     global openai_embeddings
     if openai_embeddings is None:
@@ -112,21 +98,6 @@ def get_openai_embeddings():
             logger.error(f"Error initializing OpenAI embeddings: {e}")
             raise
     return openai_embeddings
-
-def get_tfidf_vector_db():
-    global tfidf_vector_db
-    if tfidf_vector_db is None:
-        try:
-            # Load from local storage with allow_dangerous_deserialization=True for backward compatibility
-            logger.info("Attempting to load TF-IDF FAISS index...")
-            tfidf_vector_db = FAISS.load_local("faiss_index", get_tfidf_embeddings(), allow_dangerous_deserialization=True)
-            logger.info("Loaded TF-IDF FAISS index from local storage")
-        except Exception as e:
-            logger.error(f"Error loading TF-IDF FAISS index: {e}")
-            logger.info("TF-IDF index not found. Please run initialize_db.py first.")
-            # Option to return None or raise an error
-            return None
-    return tfidf_vector_db
 
 def get_openai_vector_db():
     global openai_vector_db
@@ -150,12 +121,6 @@ def get_vector_db(embedding_type="openai"):
         if db is None:
             logger.warning("OpenAI DB not available, falling back to TF-IDF")
             return get_tfidf_vector_db()
-        return db
-    else:
-        db = get_tfidf_vector_db()
-        if db is None:
-            logger.warning("TF-IDF DB not available, falling back to OpenAI")
-            return get_openai_vector_db()
         return db
 
 def get_llm():
@@ -206,31 +171,6 @@ Be concise and precise. If the context doesn't contain the answer, say so.
 Your style of answer should be one of an obnoxious and sarcastic know-it-all, who doesn't like to think they're smarter than everyone else, but they are. 
 """
 
-# API endpoint to toggle embedding type
-@app.post("/api/toggle_embeddings", response_model=EmbeddingToggleResponse)
-async def toggle_embeddings(request: EmbeddingToggleRequest):
-    global current_embedding_type
-    
-    if request.embedding_type not in ["tfidf", "openai"]:
-        raise HTTPException(status_code=400, detail="Invalid embedding type. Must be 'tfidf' or 'openai'")
-    
-    previous_type = current_embedding_type
-    current_embedding_type = request.embedding_type
-    
-    # Ensure the vector database is loaded
-    db_to_check = get_tfidf_vector_db() if current_embedding_type == "tfidf" else get_openai_vector_db()
-    if db_to_check is None:
-        message = f"Switched to {current_embedding_type} but index is not available. Please initialize it."
-        logger.warning(f"Cannot switch to {current_embedding_type}: index not found.")
-    else:
-        message = f"Switched to {current_embedding_type} embeddings"
-        logger.info(f"Embedding type changed from {previous_type} to {current_embedding_type}")
-    
-    return {
-        "success": db_to_check is not None,
-        "embedding_type": current_embedding_type,
-        "message": message
-    }
 
 # Create endpoint for chat
 @app.post("/api/chat", response_model=ChatResponse)
