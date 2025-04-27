@@ -3,10 +3,10 @@ uvicorn
 pydantic
 openai
 python-dotenv
+faiss-cpu
 pypdf
 tiktoken
 python-multipart
-pycryptodome
 langchain-community
 langchain-openai
 langchain-core
