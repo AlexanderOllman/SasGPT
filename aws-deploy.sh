@@ -233,7 +233,9 @@ fi
 # ── 1) DOMAIN REGISTRATION ─────────────────────────────────────────
 
 # Domain is initially set from config load/prompt above
-echo "👉 Step 1: Check Domain Availability & Confirm Registration"
+echo "👉 Step 1: Check Domain Availability & Confirm Registration/Use Existing"
+
+DOMAIN_OPERATION="register" # Default action is to register a new domain
 
 # Loop until an available domain is confirmed or user quits
 while true; do
@@ -250,10 +252,11 @@ while true; do
     echo "✅ Domain '${DOMAIN}' is available!"
     read -rp "Use this domain for registration? (y/N): " CONFIRM_DOMAIN
     if [[ "${CONFIRM_DOMAIN,,}" == "y" ]]; then
-      echo "✓ Proceeding with domain '${DOMAIN}'."
-      break # Exit the loop, domain confirmed
+      echo "✓ Proceeding to register new domain '${DOMAIN}'."
+      DOMAIN_OPERATION="register"
+      break # Exit the loop, domain confirmed for registration
     else
-      echo "Domain not confirmed."
+      echo "Domain registration not confirmed."
       # Fall through to prompt for a new domain
     fi
   else
@@ -267,11 +270,37 @@ while true; do
       else
          echo "❌ Error checking domain '${DOMAIN}': $AVAILABILITY_OUTPUT"
       fi
+      # Fall through to prompt for a new domain
     else
       # Successful command but domain not available
-      echo "❌ Domain '${DOMAIN}' is not available (${AVAILABILITY_OUTPUT})."
+      echo "ℹ️ Domain '${DOMAIN}' is not available (${AVAILABILITY_OUTPUT}). Checking if registered in this account..."
+      # Check if the domain exists in the account's registered domains
+      REGISTERED_DOMAINS=$(aws route53domains list-domains --region "$AWS_REGION" --output json 2>&1)
+      LIST_EXIT_CODE=$?
+      DOMAIN_FOUND_IN_ACCOUNT=false
+      if [[ $LIST_EXIT_CODE -eq 0 ]] && echo "$REGISTERED_DOMAINS" | grep -q "\"DomainName\": \"$DOMAIN\""; then
+          DOMAIN_FOUND_IN_ACCOUNT=true
+      fi
+
+      if [[ "$DOMAIN_FOUND_IN_ACCOUNT" == true ]]; then
+          echo "✅ Domain '${DOMAIN}' is already registered in this AWS account."
+          read -rp "Use this existing domain registration? (y/N): " CONFIRM_EXISTING
+          if [[ "${CONFIRM_EXISTING,,}" == "y" ]]; then
+              echo "✓ Proceeding using existing registration for '${DOMAIN}'."
+              DOMAIN_OPERATION="use_existing"
+              break # Exit the loop, existing domain confirmed
+          else
+              echo "Existing domain not confirmed for use."
+              # Fall through to prompt for a new domain
+          fi
+      else
+          if [[ $LIST_EXIT_CODE -ne 0 ]]; then
+              echo "⚠️ Could not list domains in account to verify ownership: $REGISTERED_DOMAINS" >&2
+          fi
+          echo "❌ Domain '${DOMAIN}' is unavailable and does not appear to be registered in this account."
+          # Fall through to prompt for a new domain
+      fi
     fi
-    # Fall through to prompt for a new domain
   fi
 
   # Prompt for a new domain or quit
@@ -294,65 +323,70 @@ while true; do
 done
 
 # -- Domain is now confirmed and stored in $DOMAIN variable --
+# -- DOMAIN_OPERATION indicates whether to 'register' or 'use_existing' --
 
-# Generate register-domain.json using loaded/entered variables
-echo "Generating domain registration request..."
-cat > register-domain.json <<EOF
-{
-  "DomainName": "${DOMAIN}",
-  "DurationInYears": ${YEARS},
-  "AutoRenew": true,
-  "AdminContact": {
-    "FirstName": "${FIRST_NAME}",
-    "LastName": "${LAST_NAME}",
-    "ContactType": "PERSON",
-    "Email": "${EMAIL}",
-    "AddressLine1": "${ADDR1}",
-    "City": "${CITY}",
-    "State": "${STATE}",
-    "CountryCode": "${CC}",
-    "ZipCode": "${ZIP}",
-    "PhoneNumber": "${PHONE}"
-  },
-  "RegistrantContact": {
-    "FirstName": "${FIRST_NAME}",
-    "LastName": "${LAST_NAME}",
-    "ContactType": "PERSON",
-    "Email": "${EMAIL}",
-    "AddressLine1": "${ADDR1}",
-    "City": "${CITY}",
-    "State": "${STATE}",
-    "CountryCode": "${CC}",
-    "ZipCode": "${ZIP}",
-    "PhoneNumber": "${PHONE}"
-  },
-  "TechContact": {
-    "FirstName": "${FIRST_NAME}",
-    "LastName": "${LAST_NAME}",
-    "ContactType": "PERSON",
-    "Email": "${EMAIL}",
-    "AddressLine1": "${ADDR1}",
-    "City": "${CITY}",
-    "State": "${STATE}",
-    "CountryCode": "${CC}",
-    "ZipCode": "${ZIP}",
-    "PhoneNumber": "${PHONE}"
-  },
-  "PrivacyProtectAdminContact": true,
-  "PrivacyProtectRegistrantContact": true,
-  "PrivacyProtectTechContact": true
-}
+if [[ "$DOMAIN_OPERATION" == "register" ]]; then
+  # Generate register-domain.json using loaded/entered variables
+  echo "Generating domain registration request..."
+  cat > register-domain.json <<EOF
+  {
+    "DomainName": "${DOMAIN}",
+    "DurationInYears": ${YEARS},
+    "AutoRenew": true,
+    "AdminContact": {
+      "FirstName": "${FIRST_NAME}",
+      "LastName": "${LAST_NAME}",
+      "ContactType": "PERSON",
+      "Email": "${EMAIL}",
+      "AddressLine1": "${ADDR1}",
+      "City": "${CITY}",
+      "State": "${STATE}",
+      "CountryCode": "${CC}",
+      "ZipCode": "${ZIP}",
+      "PhoneNumber": "${PHONE}"
+    },
+    "RegistrantContact": {
+      "FirstName": "${FIRST_NAME}",
+      "LastName": "${LAST_NAME}",
+      "ContactType": "PERSON",
+      "Email": "${EMAIL}",
+      "AddressLine1": "${ADDR1}",
+      "City": "${CITY}",
+      "State": "${STATE}",
+      "CountryCode": "${CC}",
+      "ZipCode": "${ZIP}",
+      "PhoneNumber": "${PHONE}"
+    },
+    "TechContact": {
+      "FirstName": "${FIRST_NAME}",
+      "LastName": "${LAST_NAME}",
+      "ContactType": "PERSON",
+      "Email": "${EMAIL}",
+      "AddressLine1": "${ADDR1}",
+      "City": "${CITY}",
+      "State": "${STATE}",
+      "CountryCode": "${CC}",
+      "ZipCode": "${ZIP}",
+      "PhoneNumber": "${PHONE}"
+    },
+    "PrivacyProtectAdminContact": true,
+    "PrivacyProtectRegistrantContact": true,
+    "PrivacyProtectTechContact": true
+  }
 EOF
-echo "✓ Registration request JSON generated."
+  echo "✓ Registration request JSON generated."
 
-echo "Registering domain ${DOMAIN}…"
-aws route53domains register-domain \
-  --region "$AWS_REGION" \
-  --cli-input-json file://register-domain.json
+  echo "Registering domain ${DOMAIN}…"
+  aws route53domains register-domain \
+    --region "$AWS_REGION" \
+    --cli-input-json file://register-domain.json
 
-echo "✅ Registration submitted. Track status with:"
-echo "    aws route53domains get-domain-detail --region $AWS_REGION --domain-name $DOMAIN"
-pause
+  echo "✅ Registration submitted. Track status with:"
+  echo "    aws route53domains get-domain-detail --region $AWS_REGION --domain-name $DOMAIN"
+  pause
+else
+  echo "ℹ️ Skipping domain registration step as requested, using existing registration for '${DOMAIN}'."
+fi
 
 # ── 2) LIGHTSAIL CONTAINER SERVICE ─────────────────────────────────
 
