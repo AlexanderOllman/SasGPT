@@ -114,6 +114,31 @@ function pause() {
   read -rp "Press ENTER to continue..."
 }
 
+# Function to offer editing a file with nano, vim, or vi
+offer_edit_if_editor_exists() {
+  local filename="$1"
+  local editor_cmd=""
+
+  if command -v nano >/dev/null 2>&1; then
+    editor_cmd="nano"
+  elif command -v vim >/dev/null 2>&1; then
+    editor_cmd="vim"
+  elif command -v vi >/dev/null 2>&1; then
+    editor_cmd="vi"
+  fi
+
+  if [[ -n "$editor_cmd" ]]; then
+    read -rp "View/edit $filename in $editor_cmd before proceeding? (y/N): " EDIT_FILE_CONFIRM
+    if [[ "${EDIT_FILE_CONFIRM,,}" == "y" ]]; then
+      echo "Launching $editor_cmd... Save and exit the editor to continue."
+      eval "$editor_cmd $filename" # Requires direct terminal interaction
+      echo "Continuing script after $editor_cmd session..."
+    fi
+  else
+    echo "(No suitable editor found [checked nano, vim, vi], skipping option to edit $filename)"
+  fi
+}
+
 # ── ENSURE LIGHTSAILCTL PLUGIN ─────────────────────────────────────
 
 ensure_lightsailctl() {
@@ -374,7 +399,10 @@ if [[ "$DOMAIN_OPERATION" == "register" ]]; then
     "PrivacyProtectTechContact": true
   }
 EOF
-  echo "✓ Registration request JSON generated."
+  echo "✓ Registration request JSON generated (register-domain.json)."
+
+  # Optional Vim edit
+  offer_edit_if_editor_exists register-domain.json
 
   echo "Registering domain ${DOMAIN}…"
   aws route53domains register-domain \
@@ -563,6 +591,11 @@ cat > deploy.json <<EOF
 }
 EOF
 
+echo "✓ Deployment configuration JSON generated (deploy.json)."
+
+# Optional Vim edit
+offer_edit_if_editor_exists deploy.json
+
 aws lightsail create-container-service-deployment \
   --cli-input-json file://deploy.json
 
@@ -572,12 +605,22 @@ pause
 
 echo "👉 Step 5: Create DNS record"
 # Use DOMAIN and SERVICE_NAME obtained above
+# Get the public domain name for the target
+SERVICE_PUBLIC_DOMAIN=$(aws lightsail get-container-services \
+  --service-name "$SERVICE_NAME" \
+  --region "$AWS_REGION" \
+  --query "containerServices[?serviceName=='$SERVICE_NAME'] | [0].publicDomainName" \
+  --output text)
+
+if [[ -z "$SERVICE_PUBLIC_DOMAIN" ]]; then
+    echo "❌ Error: Could not retrieve public domain name for service '${SERVICE_NAME}'. Cannot create DNS entry." >&2
+    exit 1
+fi
+
+echo "ℹ️ Target public domain for DNS: $SERVICE_PUBLIC_DOMAIN"
+
 aws lightsail create-domain-entry \
   --domain-name "$DOMAIN" \
-  --domain-entry name="$DOMAIN",target="$(aws lightsail get-container-service \
-    --service-name "$SERVICE_NAME" \
-    --region "$AWS_REGION" \
-    --query 'containerService.publicDomainName' \
-    --output text)",type=A,isAlias=true
+  --domain-entry name="$DOMAIN",target="$SERVICE_PUBLIC_DOMAIN",type=A,isAlias=true
 
 echo "🎉 Done! Allow DNS 10–30 minutes, then visit: https://${DOMAIN}"
