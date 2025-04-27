@@ -325,5 +325,9 @@ async def chat(request: ChatRequest):
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 if __name__ == "__main__":
+    import os
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port="$PORT", reload=True) 
+    # Use a fixed port like 8000 for local development,
+    # or read the PORT env var if you set it locally.
+    local_port = int(os.getenv("PORT", 8000))
+    uvicorn.run("app:app", host="0.0.0.0", port=local_port, reload=True) 
