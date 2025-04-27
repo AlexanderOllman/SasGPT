@@ -401,11 +401,20 @@ fi
 # Loop until service is successfully created or confirmed
 while true; do
   echo "Attempting to create Lightsail container service '${SERVICE_NAME}'..."
+  # Temporarily disable exit on error to ensure we capture output/code
+  set +e
   CREATE_OUTPUT=$(aws lightsail create-container-service \
     --service-name "$SERVICE_NAME" \
     --power micro \
     --scale 1 2>&1) # Capture stderr
   EXIT_CODE=$?
+  # Re-enable exit on error
+  set -e
+
+  # --- Debugging --- >
+  echo "DEBUG: AWS command exit code: $EXIT_CODE"
+  echo "DEBUG: AWS command output: $CREATE_OUTPUT"
+  # --- End Debugging ---
 
   if [[ $EXIT_CODE -eq 0 ]]; then
     echo "✅ Service '${SERVICE_NAME}' created successfully."
