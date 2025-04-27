@@ -139,6 +139,32 @@ offer_edit_if_editor_exists() {
   fi
 }
 
+# Function for wait animation
+wait_with_animation() {
+  local duration=$1
+  local message=${2:-Waiting}
+  local chars=("." ".." "..." "...")
+  local delay=0.5
+  local elapsed=0
+
+  echo -n "$message "
+  while [[ $elapsed -lt $duration ]]; do
+    for i in {0..3}; do
+      echo -ne "${chars[i]} \r"
+      sleep $delay
+    done
+    elapsed=$(echo "$elapsed + ($delay * 4)" | bc)
+    # Ensure we don't massively overshoot on the last cycle
+    if [[ $(echo "$elapsed >= $duration" | bc) -eq 1 ]]; then
+        break
+    fi
+    echo -n "$message " # Reprint message after clearing line
+  done
+  # Clear the animation line
+  printf '%*s\n' "$(tput cols)" "" 
+  echo "${message} done." # Indicate completion
+}
+
 # ── ENSURE LIGHTSAILCTL PLUGIN ─────────────────────────────────────
 
 ensure_lightsailctl() {
@@ -427,6 +453,7 @@ if [[ -z "${SERVICE_NAME:-}" ]]; then
 fi
 
 # Loop until service is successfully created or confirmed
+CREATION_ATTEMPT_AFTER_DELETE=false # Flag to track if we are in a post-delete retry phase
 while true; do
   echo "Attempting to create Lightsail container service '${SERVICE_NAME}'..."
   # Temporarily disable exit on error to ensure we capture output/code
@@ -448,8 +475,49 @@ while true; do
     echo "✅ Service '${SERVICE_NAME}' created successfully."
     break # Service created, exit loop
   else
-    # Check for the specific "already exists" error
-    if echo "$CREATE_OUTPUT" | grep -q -E 'Resource.+already exists'; then
+    # Check if we failed specifically due to "done DELETING" *after* we confirmed deletion
+    if [[ "$CREATION_ATTEMPT_AFTER_DELETE" == true ]] && echo "$CREATE_OUTPUT" | grep -q "done DELETING"; then
+        echo "⏳ Service name '${SERVICE_NAME}' still finalizing deletion. Retrying up to 3 times..."
+        CREATION_ATTEMPT_AFTER_DELETE=false # Reset flag for next outer loop iteration if needed
+        RETRY_COUNT=0
+        MAX_RETRIES=3
+        CREATED_IN_RETRY=false
+        while [[ $RETRY_COUNT -lt $MAX_RETRIES ]]; do
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "  Retry attempt ${RETRY_COUNT}/${MAX_RETRIES}..."
+            wait_with_animation 15 "  Waiting 15s before retry"
+            
+            echo "  Attempting creation (retry ${RETRY_COUNT})..."
+            set +e
+            CREATE_OUTPUT=$(aws lightsail create-container-service \
+                --service-name "$SERVICE_NAME" --power micro --scale 1 2>&1)
+            EXIT_CODE=$?
+            set -e
+            echo "  DEBUG (Retry ${RETRY_COUNT}): Exit Code: $EXIT_CODE, Output: $CREATE_OUTPUT"
+
+            if [[ $EXIT_CODE -eq 0 ]]; then
+                echo "✅ Service '${SERVICE_NAME}' created successfully on retry ${RETRY_COUNT}."
+                CREATED_IN_RETRY=true
+                break # Success, break inner retry loop
+            elif echo "$CREATE_OUTPUT" | grep -q "done DELETING"; then
+                echo "  Still waiting for deletion to finalize..."
+                # Continue to next retry attempt
+            else
+                echo "❌ Unexpected error during retry ${RETRY_COUNT}: $CREATE_OUTPUT" >&2
+                # Break inner loop on unexpected error, will fall through to rename/quit
+                break 
+            fi
+        done
+
+        if [[ "$CREATED_IN_RETRY" == true ]]; then
+            break # Break outer loop as service was created in retry
+        else
+            echo "❌ Failed to create service '${SERVICE_NAME}' after ${MAX_RETRIES} retries due to ongoing deletion finalization." >&2
+            # Fall through to rename/quit logic
+        fi
+
+    # Check for the general "already exists" error (before deletion attempt)
+    elif echo "$CREATE_OUTPUT" | grep -q -E 'Resource.+already exists'; then
       echo "⚠️ Service name '${SERVICE_NAME}' already exists."
       read -rp "(D)elete existing service and recreate, (R)ename service, or (Q)uit? [R]: " SERVICE_ACTION
       SERVICE_ACTION=${SERVICE_ACTION:-R} # Default to Rename
@@ -473,7 +541,7 @@ while true; do
             while [[ $SECONDS_WAITED -lt $MAX_WAIT_SECONDS ]]; do
               echo "  (Waited ${SECONDS_WAITED}s / ${MAX_WAIT_SECONDS}s) Checking if service '${SERVICE_NAME}' is deleted..."
               set +e # Don't exit if get-container-service fails (means it's deleted)
-              aws lightsail get-container-service --service-name "$SERVICE_NAME" > /dev/null 2>&1
+              aws lightsail get-container-services --service-name "$SERVICE_NAME" > /dev/null 2>&1
               GET_EXIT_CODE=$?
               set -e
 
@@ -491,7 +559,10 @@ while true; do
             # --- End Monitoring Loop ---
 
             if [[ "$DELETED" == true ]]; then
-              echo "✓ Deletion confirmed. Proceeding to recreate service."
+              echo "✓ Deletion confirmed."
+              # Add initial 30s wait after confirmed deletion
+              wait_with_animation 30 "  Waiting 30s for AWS to fully process deletion"
+              CREATION_ATTEMPT_AFTER_DELETE=true # Set flag for the next outer loop iteration
               continue # Loop back to the outer loop to try creating again
             else
               echo "❌ Service '${SERVICE_NAME}' was not confirmed deleted after ${MAX_WAIT_SECONDS} seconds." >&2
@@ -526,11 +597,12 @@ while true; do
           fi
           SERVICE_NAME="$NEW_SERVICE_NAME"
           echo "✓ Changed service name to '${SERVICE_NAME}'. Retrying creation..."
+          CREATION_ATTEMPT_AFTER_DELETE=false # Reset flag if renaming
           continue # Loop back to try creating with the new name
           ;;
       esac
     else
-      # Handle other errors during creation
+      # Handle other unexpected errors during creation
       echo "❌ An unexpected error occurred creating service '${SERVICE_NAME}': $CREATE_OUTPUT" >&2
       exit 1 # Exit on unexpected errors
     fi
