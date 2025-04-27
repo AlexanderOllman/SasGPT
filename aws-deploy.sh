@@ -158,17 +158,54 @@ fi
 
 # ── 1) DOMAIN REGISTRATION ─────────────────────────────────────────
 
-echo "Checking availability for ${DOMAIN}…"
-aws route53domains check-domain-availability \
-  --region "$AWS_REGION" \
-  --domain-name "$DOMAIN" \
-  --query 'Availability' --output text
+# Domain is initially set from config load/prompt above
+echo "👉 Step 1: Check Domain Availability & Confirm Registration"
 
-read -rp "Domain available? (y/N): " OK
-if [[ "${OK,,}" != "y" ]]; then
-  echo "Exiting—domain not available." && exit 1
-fi
+# Loop until an available domain is confirmed or user quits
+while true; do
+  echo "Checking availability for '${DOMAIN}'…"
+  AVAILABILITY=$(aws route53domains check-domain-availability \
+    --region "$AWS_REGION" \
+    --domain-name "$DOMAIN" \
+    --query 'Availability' --output text)
 
+  if [[ "$AVAILABILITY" == "AVAILABLE" ]]; then
+    echo "✅ Domain '${DOMAIN}' is available!"
+    read -rp "Use this domain for registration? (y/N): " CONFIRM_DOMAIN
+    if [[ "${CONFIRM_DOMAIN,,}" == "y" ]]; then
+      echo "✓ Proceeding with domain '${DOMAIN}'."
+      break # Exit the loop, domain confirmed
+    else
+      echo "Domain not confirmed."
+      # Fall through to prompt for a new domain
+    fi
+  else
+    echo "❌ Domain '${DOMAIN}' is not available (${AVAILABILITY})."
+    # Fall through to prompt for a new domain
+  fi
+
+  # Prompt for a new domain or quit
+  read -rp "Enter a different domain name (or type 'quit' to exit): " NEW_DOMAIN
+  if [[ "${NEW_DOMAIN,,}" == "quit" ]]; then
+    echo "Exiting script as requested." >&2
+    exit 1
+  fi
+  # Validate new domain input somewhat (basic check for non-empty)
+  if [[ -z "$NEW_DOMAIN" ]]; then
+      echo "Invalid input. Please enter a domain name or 'quit'." >&2
+      continue # Re-prompt without changing DOMAIN
+  fi
+  DOMAIN="$NEW_DOMAIN"
+  # Optionally update the config file here if desired?
+  # echo "Updating domain in ${CONFIG_FILE}..."
+  # sed -i.bak "s/^DOMAIN=.*/DOMAIN=\"${DOMAIN}\"/" "$CONFIG_FILE"
+  # For now, just use the new domain for the current script run
+
+done
+
+# -- Domain is now confirmed and stored in $DOMAIN variable --
+
+# Generate register-domain.json using loaded/entered variables
 echo "Generating domain registration request..."
 cat > register-domain.json <<EOF
 {
