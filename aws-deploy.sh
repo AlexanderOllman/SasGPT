@@ -139,29 +139,22 @@ offer_edit_if_editor_exists() {
   fi
 }
 
-# Function for wait animation
+# Function for wait animation (revised to use integer sleep)
 wait_with_animation() {
-  local duration=$1
+  local total_duration_seconds=$1
   local message=${2:-Waiting}
-  local chars=("." ".." "..." "...")
-  local delay=0.5
-  local elapsed=0
+  local chars=(".  " ".. " "...") # Adjusted spacing for clear overwrite
+  local delay=1 # Sleep for 1 second each iteration
 
   echo -n "$message "
-  while [[ $elapsed -lt $duration ]]; do
-    for i in {0..3}; do
-      echo -ne "${chars[i]} \r"
-      sleep $delay
-    done
-    elapsed=$(echo "$elapsed + ($delay * 4)" | bc)
-    # Ensure we don't massively overshoot on the last cycle
-    if [[ $(echo "$elapsed >= $duration" | bc) -eq 1 ]]; then
-        break
-    fi
-    echo -n "$message " # Reprint message after clearing line
+  for (( i=0; i<total_duration_seconds; i++ )); do
+    local index=$(( i % ${#chars[@]} ))
+    echo -ne "${chars[index]}\r"
+    sleep $delay
+    echo -n "$message " # Reprint message after clearing line with \r
   done
-  # Clear the animation line
-  printf '%*s\n' "$(tput cols)" "" 
+  # Clear the animation line completely
+  printf '%*s\r' "$(tput cols)" "" 
   echo "${message} done." # Indicate completion
 }
 
