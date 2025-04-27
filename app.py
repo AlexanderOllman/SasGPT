@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 import logging
@@ -266,5 +266,5 @@ if __name__ == "__main__":
     import uvicorn
     # Use a fixed port like 8000 for local development,
     # or read the PORT env var if you set it locally.
-    local_port = int(os.getenv("PORT", 8000))
+    local_port = int(os.getenv("PORT", 8005))
     uvicorn.run("app:app", host="0.0.0.0", port=local_port, reload=True) 
