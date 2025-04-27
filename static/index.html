@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AGLC RAG Chatbot</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/styles/atom-one-dark.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="header-content">
+                <h1>AGLC RAG Chatbot</h1>
+                <!-- Hamburger menu for mobile -->
+                <button class="hamburger-menu" id="hamburger-menu" aria-label="Toggle settings menu">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+                <!-- Embedding toggle for desktop -->
+                <div class="embedding-toggle desktop-only">
+                    <span class="toggle-option" data-value="tfidf">TF-IDF</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="embedding-toggle-desktop" checked>
+                        <span class="slider round"></span>
+                    </label>
+                    <span class="toggle-option active" data-value="openai">OpenAI</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Settings Sidebar (Mobile) -->
+        <div class="settings-sidebar" id="settings-sidebar">
+            <button class="close-sidebar" id="close-sidebar" aria-label="Close settings menu">&times;</button>
+            <h2>Settings</h2>
+            <div class="setting-item">
+                <label class="setting-label">Embedding Type:</label>
+                <div class="embedding-toggle mobile-toggle">
+                     <span class="toggle-option" data-value="tfidf">TF-IDF</span>
+                     <label class="toggle">
+                         <input type="checkbox" id="embedding-toggle-mobile" checked>
+                         <span class="slider round"></span>
+                     </label>
+                     <span class="toggle-option active" data-value="openai">OpenAI</span>
+                </div>
+            </div>
+            <!-- Add more settings here if needed -->
+        </div>
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+        
+        <div class="main-content">
+            <div class="chat-container">
+                <div class="chat-messages" id="chat-messages">
+                    <div class="message bot-message">
+                        <div class="message-content">
+                            Hello! I'm the AGLC RAG Chatbot. I can help you with questions about the Australian Guide to Legal Citation. Ask me anything about AGLC!
+                        </div>
+                    </div>
+                </div>
+                
+                <form id="chat-form" class="chat-input">
+                    <input type="text" id="user-input" placeholder="Ask a question about AGLC...">
+                    <button type="submit" class="send-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </form>
+            </div>
+            
+            <div class="citations-container">
+                <h2>Citations</h2>
+                <div class="citation-list" id="citation-list">
+                    <div class="citation-item">
+                        No citations yet. Ask a question to see relevant citations.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Load Markdown and syntax highlighting libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/lib/core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/lib/languages/xml.min.js"></script>
+    <script>
+        // Configure marked options
+        marked.setOptions({
+            highlight: function(code, lang) {
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true
+        });
+    </script>
+    <script src="script.js"></script>
+</body>
+</html> 
