@@ -22,9 +22,38 @@ The script requires AWS credentials with permissions to manage Route 53 Domains 
     *   Click **Next**.
 4.  **Set Permissions:**
     *   Choose **Attach policies directly**.
-    *   In the filter policies search box, search for and select the following AWS managed policies:
-        *   `AmazonRoute53DomainsFullAccess`
-        *   `AmazonLightsailFullAccess`
+    *   Click **Create policy**. This will open a new browser tab.
+        *   In the new tab, select the **JSON** tab.
+        *   Delete the placeholder content and paste the following JSON policy definition. This grants full access to **both** Lightsail and Route 53 Domains:
+          ```json
+          {
+              "Version": "2012-10-17",
+              "Statement": [
+                  {
+                      "Effect": "Allow",
+                      "Action": [
+                          "lightsail:*"
+                      ],
+                      "Resource": "*"
+                  },
+                  {
+                      "Effect": "Allow",
+                      "Action": [
+                          "route53domains:*"
+                      ],
+                      "Resource": "*"
+                  }
+              ]
+          }
+          ```
+        *   Click **Next: Tags** (adding tags is optional).
+        *   Click **Next: Review**.
+        *   Enter a **Name** for the policy (e.g., `LightsailAndRoute53DomainsFullAccessCustom`).
+        *   (Optional) Add a description.
+        *   Click **Create policy**.
+        *   Close this browser tab and return to the original "Create user" tab.
+    *   Back in the "Create user" tab, click the refresh button next to the "Create policy" button.
+    *   In the filter policies search box, search for the policy you just created (e.g., `LightsailAndRoute53DomainsFullAccessCustom`) and select it.
     *   *(Optional Security Note: For production environments, it's recommended to create a custom IAM policy with only the specific permissions required by the script instead of using these broad full-access policies.)*
     *   Click **Next**.
 5.  **Review and Create:**

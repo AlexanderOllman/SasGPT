@@ -1,2 +1,4 @@
 .vercel
 .git
+# Deployment configuration file (contains secrets!)
+.deploy_config.env
