@@ -15,6 +15,8 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 import logging
 
+# Import our simple TF-IDF implementation
+from simple_embeddings import SimpleTfidfEmbeddings
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -267,5 +269,5 @@ if __name__ == "__main__":
     import uvicorn
     # Use a fixed port like 8000 for local development,
     # or read the PORT env var if you set it locally.
-    # local_port = int(os.getenv("PORT", 8000))
-    uvicorn.run("app:app", host="0.0.0.0", reload=True) 
+    local_port = int(os.getenv("PORT", 8000))
+    uvicorn.run("app:app", host="0.0.0.0", port=local_port, reload=True) 
