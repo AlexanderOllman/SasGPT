@@ -390,19 +390,81 @@ fi
 
 # ── 2) LIGHTSAIL CONTAINER SERVICE ─────────────────────────────────
 
-echo "👉 Step 2: Create Lightsail container service"
-# Check if SERVICE_NAME was loaded, otherwise prompt
-if [[ -z "${SERVICE_NAME:-}" ]]; then
-  read -rp "Enter Lightsail Service name: " SERVICE_NAME
-  # Optionally, save SERVICE_NAME back to config if needed for future runs?
-  # For now, it's prompted each time if not loaded/set.
-fi
-echo "Using service name: ${SERVICE_NAME}"
+echo "👉 Step 2: Create/Confirm Lightsail container service"
 
-aws lightsail create-container-service \
-  --service-name "$SERVICE_NAME" \
-  --power micro \
-  --scale 1
+# Check if SERVICE_NAME was loaded, otherwise prompt initially
+if [[ -z "${SERVICE_NAME:-}" ]]; then
+  read -rp "Enter initial Lightsail Service name: " SERVICE_NAME
+  # Note: We don't save this back to config automatically, user interaction below handles it.
+fi
+
+# Loop until service is successfully created or confirmed
+while true; do
+  echo "Attempting to create Lightsail container service '${SERVICE_NAME}'..."
+  CREATE_OUTPUT=$(aws lightsail create-container-service \
+    --service-name "$SERVICE_NAME" \
+    --power micro \
+    --scale 1 2>&1) # Capture stderr
+  EXIT_CODE=$?
+
+  if [[ $EXIT_CODE -eq 0 ]]; then
+    echo "✅ Service '${SERVICE_NAME}' created successfully."
+    break # Service created, exit loop
+  else
+    # Check for the specific "already exists" error
+    if echo "$CREATE_OUTPUT" | grep -q -E 'Resource.+already exists'; then
+      echo "⚠️ Service name '${SERVICE_NAME}' already exists."
+      read -rp "(D)elete existing service and recreate, (R)ename service, or (Q)uit? [R]: " SERVICE_ACTION
+      SERVICE_ACTION=${SERVICE_ACTION:-R} # Default to Rename
+
+      case "${SERVICE_ACTION,,}" in
+        d|delete)
+          echo "Attempting to delete existing service '${SERVICE_NAME}'..."
+          DELETE_OUTPUT=$(aws lightsail delete-container-service --service-name "$SERVICE_NAME" 2>&1)
+          DELETE_EXIT_CODE=$?
+          if [[ $DELETE_EXIT_CODE -eq 0 ]]; then
+            echo "✓ Existing service '${SERVICE_NAME}' deleted. Will retry creation."
+            # Brief pause might be needed for deletion to fully register
+            echo "Pausing briefly before retrying creation..."
+            sleep 5
+            continue # Loop back to try creating again with the same name
+          else
+            echo "❌ Failed to delete existing service '${SERVICE_NAME}': $DELETE_OUTPUT" >&2
+            echo "Please resolve manually or choose a different name." >&2
+            # Fall through to prompt for rename/quit
+            read -rp "(R)ename service, or (Q)uit? [R]: " RENAME_QUIT_ACTION
+            RENAME_QUIT_ACTION=${RENAME_QUIT_ACTION:-R}
+            if [[ "${RENAME_QUIT_ACTION,,}" == "q" ]]; then
+               echo "Exiting script." >&2; exit 1;
+            fi
+            # Intentional fallthrough to rename logic below
+          fi
+          ;;
+        q|quit)
+          echo "Exiting script as requested." >&2
+          exit 1
+          ;;
+        r|rename|*)
+          # Default to rename or if 'r' is chosen explicitly
+          read -rp "Enter a *different* Lightsail Service name: " NEW_SERVICE_NAME
+          if [[ -z "$NEW_SERVICE_NAME" || "$NEW_SERVICE_NAME" == "$SERVICE_NAME" ]]; then
+              echo "Invalid or unchanged name. Please enter a different name." >&2
+              continue # Re-prompt within the error handling
+          fi
+          SERVICE_NAME="$NEW_SERVICE_NAME"
+          echo "✓ Changed service name to '${SERVICE_NAME}'. Retrying creation..."
+          continue # Loop back to try creating with the new name
+          ;;
+      esac
+    else
+      # Handle other errors during creation
+      echo "❌ An unexpected error occurred creating service '${SERVICE_NAME}': $CREATE_OUTPUT" >&2
+      exit 1 # Exit on unexpected errors
+    fi
+  fi
+done
+
+# --- Service $SERVICE_NAME is now created/confirmed ---
 
 pause
 
