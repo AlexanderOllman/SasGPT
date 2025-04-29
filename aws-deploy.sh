@@ -604,46 +604,62 @@ done
 
 # --- Service $SERVICE_NAME is now created/confirmed ---
 
-# --- Monitor until Public Domain Name is available --- >
+# --- Monitor until Public Domain Name is available and Service is Ready --- >
 echo ""
-echo "⏳ Monitoring service '${SERVICE_NAME}' until public domain name is available..."
-MAX_WAIT_SECONDS_PDN=300 # Wait up to 5 minutes for public domain name
+echo "⏳ Monitoring service '${SERVICE_NAME}' until it is ready and public domain name is available..."
+MAX_WAIT_SECONDS_PDN=300 # Wait up to 5 minutes for public domain name and ready state
 CHECK_INTERVAL_SECONDS_PDN=20
 SECONDS_WAITED_PDN=0
 SERVICE_PUBLIC_DOMAIN=""
+SERVICE_STATE=""
 
 while [[ $SECONDS_WAITED_PDN -lt $MAX_WAIT_SECONDS_PDN ]]; do
-  echo "  (Waited ${SECONDS_WAITED_PDN}s / ${MAX_WAIT_SECONDS_PDN}s) Checking public domain name..."
+  echo "  (Waited ${SECONDS_WAITED_PDN}s / ${MAX_WAIT_SECONDS_PDN}s) Checking service status..."
   set +e # Don't exit if command fails temporarily
-  SERVICE_PUBLIC_DOMAIN=$(aws lightsail get-container-services \
+  SERVICE_INFO=$(aws lightsail get-container-services \
     --service-name "$SERVICE_NAME" \
     --region "$AWS_REGION" \
-    --query "containerServices[?serviceName=='$SERVICE_NAME'] | [0].publicDomainName" \
-    --output text)
+    --query "containerServices[?serviceName=='$SERVICE_NAME'] | [0].{state: state, domain: publicDomainName}" \
+    --output json)
   GET_PDN_EXIT_CODE=$?
   set -e
 
-  echo "  DEBUG: Get PDN Exit Code: $GET_PDN_EXIT_CODE, Value: '$SERVICE_PUBLIC_DOMAIN'"
+  SERVICE_STATE=$(echo "$SERVICE_INFO" | jq -r '.state // empty')
+  SERVICE_PUBLIC_DOMAIN=$(echo "$SERVICE_INFO" | jq -r '.domain // empty')
 
-  if [[ $GET_PDN_EXIT_CODE -eq 0 ]] && [[ -n "$SERVICE_PUBLIC_DOMAIN" ]] && [[ "$SERVICE_PUBLIC_DOMAIN" != "None" ]]; then
-    echo "✅ Public domain name found: ${SERVICE_PUBLIC_DOMAIN}"
-    break # Found valid domain name
+  echo "  DEBUG: Get Status Exit Code: $GET_PDN_EXIT_CODE, State: '$SERVICE_STATE', Public Domain: '$SERVICE_PUBLIC_DOMAIN'"
+
+  # Check if service is in a terminal error state
+  if [[ "$SERVICE_STATE" == "ERROR" ]] || [[ "$SERVICE_STATE" == "DISABLED" ]]; then
+      echo "❌ Error: Service '${SERVICE_NAME}' entered state '$SERVICE_STATE'. Cannot proceed." >&2
+      exit 1
   fi
 
-  # If command failed or domain is empty/None, wait and retry
+  # Check if service is ready and public domain is available
+  if [[ "$SERVICE_STATE" == "ACTIVE" || "$SERVICE_STATE" == "READY" ]] && \
+     [[ -n "$SERVICE_PUBLIC_DOMAIN" ]] && \
+     [[ "$SERVICE_PUBLIC_DOMAIN" != "None" ]]; then
+    echo "✅ Service is '$SERVICE_STATE' and public domain name found: ${SERVICE_PUBLIC_DOMAIN}"
+    break # Ready and domain found
+  fi
+
+  # If command failed or conditions not met, wait and retry
   if [[ $GET_PDN_EXIT_CODE -ne 0 ]]; then
       echo "  Warning: Failed to query service status (Exit Code: $GET_PDN_EXIT_CODE). Retrying..."
-  else
-      echo "  Public domain name not yet available ('$SERVICE_PUBLIC_DOMAIN'). Waiting ${CHECK_INTERVAL_SECONDS_PDN}s..."
+  elif [[ "$SERVICE_STATE" != "ACTIVE" && "$SERVICE_STATE" != "READY" ]]; then
+      echo "  Service state is '$SERVICE_STATE'. Waiting for ACTIVE/READY..."
+  elif [[ -z "$SERVICE_PUBLIC_DOMAIN" ]] || [[ "$SERVICE_PUBLIC_DOMAIN" == "None" ]]; then
+      echo "  Service is '$SERVICE_STATE' but public domain name not yet available ('$SERVICE_PUBLIC_DOMAIN'). Waiting..."
   fi
   sleep $CHECK_INTERVAL_SECONDS_PDN
   SECONDS_WAITED_PDN=$((SECONDS_WAITED_PDN + CHECK_INTERVAL_SECONDS_PDN))
 
 done
-# --- End Public Domain Name Monitoring ---
+# --- End Service Monitoring ---
 
-if [[ -z "$SERVICE_PUBLIC_DOMAIN" ]] || [[ "$SERVICE_PUBLIC_DOMAIN" == "None" ]]; then
-  echo "❌ Error: Timed out waiting for public domain name for service '${SERVICE_NAME}'. Cannot proceed with DNS setup." >&2
+if [[ -z "$SERVICE_PUBLIC_DOMAIN" ]] || [[ "$SERVICE_PUBLIC_DOMAIN" == "None" ]] || \
+   [[ "$SERVICE_STATE" != "ACTIVE" && "$SERVICE_STATE" != "READY" ]]; then
+  echo "❌ Error: Timed out waiting for service '${SERVICE_NAME}' to become ready (State: $SERVICE_STATE) or for public domain name (Domain: $SERVICE_PUBLIC_DOMAIN)." >&2
   exit 1
 fi
 
