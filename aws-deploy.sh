@@ -36,8 +36,42 @@ prompt_and_save_config() {
   read -rp "Postal Code:    " ZIP
   read -rp "Country Code (2-letter ISO, e.g. US, AU): " CC
 
+  echo ""
+  echo "👉 OpenAI Configuration"
+  read -rsp "Enter your OpenAI API Key: " OPENAI_API_KEY
+  echo ""
+
+  # --- Collect Custom Environment Variables --- >
+  echo "👉 Custom Environment Variables for Application"
+  # Create or clear custom env section marker in temp file
+  CUSTOM_ENV_TEMP_FILE=$(mktemp)
+  echo "# Custom Application Environment Variables" > "$CUSTOM_ENV_TEMP_FILE"
+
+  read -rp "Do you need to add any other environment variables? (y/N): " ADD_CUSTOM_ENV
+  if [[ "${ADD_CUSTOM_ENV,,}" == "y" ]]; then
+    echo "Enter variable name and value pairs. Press ENTER for the name when finished."
+    while true; do
+      read -rp "Variable Name (e.g., DATABASE_URL): " VAR_NAME
+      # Exit loop if name is empty
+      [[ -z "$VAR_NAME" ]] && break
+      # Check for invalid characters? (Optional, basic check here)
+      if [[ ! "$VAR_NAME" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+         echo "Invalid variable name format. Use letters, numbers, and underscores, starting with a letter or underscore." >&2
+         continue
+      fi
+      
+      read -rsp "Value for ${VAR_NAME}: " VAR_VALUE
+      echo ""
+      # Append to temp file, quoting value
+      echo "CUSTOM_ENV_${VAR_NAME}=\"${VAR_VALUE}\"" >> "$CUSTOM_ENV_TEMP_FILE"
+      echo "  ✓ Added ${VAR_NAME}"
+    done
+  fi
+  # --- End Custom Environment Variables --- >
+
   # Save to config file
   echo "Saving configuration to ${CONFIG_FILE}..."
+  # Combine standard config and custom env vars
   cat > "$CONFIG_FILE" <<EOF
 # AWS Credentials and Configuration
 AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
@@ -57,7 +91,14 @@ CITY="${CITY}"
 STATE="${STATE}"
 ZIP="${ZIP}"
 CC="${CC}"
+
+# Service Specific Secrets
+OPENAI_API_KEY="${OPENAI_API_KEY}"
 EOF
+  # Append custom vars from temp file
+  cat "$CUSTOM_ENV_TEMP_FILE" >> "$CONFIG_FILE"
+  rm "$CUSTOM_ENV_TEMP_FILE" # Clean up temp file
+
   chmod 600 "$CONFIG_FILE" # Restrict permissions
   echo "✓ Configuration saved."
   echo ""
@@ -133,6 +174,8 @@ offer_edit_if_editor_exists() {
       echo "Launching $editor_cmd... Save and exit the editor to continue."
       eval "$editor_cmd $filename" # Requires direct terminal interaction
       echo "Continuing script after $editor_cmd session..."
+    else
+      echo "Skipping $editor_cmd edit of $filename."
     fi
   else
     echo "(No suitable editor found [checked nano, vim, vi], skipping option to edit $filename)"
@@ -436,6 +479,45 @@ else
   echo "ℹ️ Skipping domain registration step as requested, using existing registration for '${DOMAIN}'."
 fi
 
+# --- Ensure Lightsail DNS Zone Exists --- >
+echo ""
+echo "👉 Ensuring Lightsail DNS zone exists for ${DOMAIN}..."
+DNS_ZONE_EXISTS=false
+set +e # Don't exit if get-domain fails
+aws lightsail get-domain --domain-name "$DOMAIN" > /dev/null 2>&1
+GET_ZONE_EXIT_CODE=$?
+set -e
+
+if [[ $GET_ZONE_EXIT_CODE -eq 0 ]]; then
+  echo "✅ Lightsail DNS zone for ${DOMAIN} already exists."
+  DNS_ZONE_EXISTS=true
+else
+  # Check if the error was specifically NotFoundException
+  if aws lightsail get-domain --domain-name "$DOMAIN" 2>&1 | grep -q 'NotFoundException'; then
+    echo "ℹ️ Lightsail DNS zone for ${DOMAIN} not found. Attempting to create..."
+    set +e
+    CREATE_ZONE_OUTPUT=$(aws lightsail create-domain --domain-name "$DOMAIN" 2>&1)
+    CREATE_ZONE_EXIT_CODE=$?
+    set -e
+    if [[ $CREATE_ZONE_EXIT_CODE -eq 0 ]]; then
+      echo "✅ Successfully created Lightsail DNS zone for ${DOMAIN}."
+      DNS_ZONE_EXISTS=true
+      # Optional: Pause to allow zone propagation, though usually fast
+      # wait_with_animation 10 "Waiting for DNS zone creation"
+    else
+      echo "❌ Failed to create Lightsail DNS zone for ${DOMAIN}: $CREATE_ZONE_OUTPUT" >&2
+      echo "   You might need to create it manually in the Lightsail console." >&2
+      # Decide if we should exit or try to continue (Step 5 will likely fail again)
+      # For now, let's continue and let Step 5 fail clearly.
+    fi
+  else
+    # Some other error occurred during get-domain
+    echo "⚠️ An unexpected error occurred while checking for DNS zone ${DOMAIN} (Exit Code: $GET_ZONE_EXIT_CODE)." >&2
+    # Continue, but Step 5 might fail.
+  fi
+fi
+# --- End DNS Zone Check --- >
+
 # ── 2) LIGHTSAIL CONTAINER SERVICE ─────────────────────────────────
 
 echo "👉 Step 2: Create/Confirm Lightsail container service"
@@ -692,6 +774,8 @@ SKIP_DEPLOY="n" # Default to not skipping
 SERVICE_INFO=$(aws lightsail get-container-services --service-name "$SERVICE_NAME" --region "$AWS_REGION" --output json)
 DEPLOYMENT_STATE=$(echo "$SERVICE_INFO" | jq -r '.containerServices[0].currentDeployment.state // empty')
 
+echo "DEBUG: Deployment State Check: '$DEPLOYMENT_STATE'"
+
 if [[ "$DEPLOYMENT_STATE" == "ACTIVE" ]] || [[ "$DEPLOYMENT_STATE" == "RUNNING" ]]; then
   echo "ℹ️ Service '$SERVICE_NAME' already has an active deployment (State: $DEPLOYMENT_STATE)."
   read -rp "Skip Docker build/push (Step 3) and new deployment (Step 4)? (y/N): " USER_SKIP_DEPLOY
@@ -731,29 +815,73 @@ else
   echo "ℹ️ Using image URI for deployment: $LATEST_IMAGE_URI"
 fi
 
-cat > deploy.json <<EOF
-{
-  "serviceName": "$SERVICE_NAME",
-  "containers": {
-    "app": {
-      "image": "${LATEST_IMAGE_URI}",
-      "ports": { "80": "HTTP" }
+# --- Generate Deployment JSON --- >
+# Start with base structure including the known OpenAI key
+# Use jq to safely handle JSON creation and modification
+BASE_ENV_JSON=$(jq -n --arg key "OPENAI_API_KEY" --arg val "${OPENAI_API_KEY}" '{ ($key): $val }')
+
+# Initialize final environment JSON object
+FINAL_ENV_JSON=$BASE_ENV_JSON
+
+# Read custom env vars from config and add them using jq
+if [[ -f "$CONFIG_FILE" ]]; then
+  while IFS='=' read -r full_key value || [[ -n "$full_key" ]]; do # Handle last line potentially missing newline
+    if [[ "$full_key" == CUSTOM_ENV_* ]]; then
+      var_name="${full_key#CUSTOM_ENV_}"
+      # Remove leading/trailing quotes from value (handle potential edge cases?)
+      clean_value=$(echo "$value" | sed -e 's/^"//' -e 's/"$//')
+      # Add to the JSON object using jq
+      FINAL_ENV_JSON=$(echo "$FINAL_ENV_JSON" | jq --arg key "$var_name" --arg val "$clean_value" '. + { ($key): $val }')
+    fi
+  done < <(grep '^CUSTOM_ENV_' "$CONFIG_FILE" || true) # grep exits 1 if no match, || true prevents script exit
+fi
+
+# Construct the final deploy.json content
+# Use jq to merge the environment object into the main structure
+DEPLOY_JSON=$(jq -n \
+  --arg serviceName "$SERVICE_NAME" \
+  --arg imageUri "${LATEST_IMAGE_URI}" \
+  --argjson envVars "$FINAL_ENV_JSON" \
+'{ 
+    serviceName: $serviceName,
+    containers: {
+      app: {
+        image: $imageUri,
+        ports: { "80": "HTTP" },
+        environment: $envVars
+      }
+    },
+    publicEndpoint: {
+      containerName: "app",
+      containerPort: 80
     }
-  },
-  "publicEndpoint": {
-    "containerName": "app",
-    "containerPort": 80
-  }
-}
-EOF
+  }')
+
+# Write the final JSON to the file
+echo "$DEPLOY_JSON" > deploy.json
+# --- End Generate Deployment JSON --- >
 
 echo "✓ Deployment configuration JSON generated (deploy.json)."
 
 # Optional Vim edit
 offer_edit_if_editor_exists deploy.json
 
-aws lightsail create-container-service-deployment \
-  --cli-input-json file://deploy.json
+# Confirm before deploying
+read -rp "Proceed with deployment using deploy.json? (Y/n): " CONFIRM_DEPLOY
+CONFIRM_DEPLOY=${CONFIRM_DEPLOY:-Y} # Default to Yes
+
+if [[ "${CONFIRM_DEPLOY,,}" == "y" ]]; then
+  echo "Deploying..."
+  aws lightsail create-container-service-deployment \
+    --cli-input-json file://deploy.json
+
+  # Consider adding error check here based on exit code
+  echo "✓ Deployment submitted."
+else
+  echo "Deployment cancelled by user."
+  # Optionally exit here if deployment is critical?
+  # exit 1
+fi
 
 pause
 
