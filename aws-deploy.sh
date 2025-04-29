@@ -513,10 +513,16 @@ while true; do
     # Check for the general "already exists" error (before deletion attempt)
     elif echo "$CREATE_OUTPUT" | grep -q -E 'Resource.+already exists'; then
       echo "⚠️ Service name '${SERVICE_NAME}' already exists."
-      read -rp "(D)elete existing service and recreate, (R)ename service, or (Q)uit? [R]: " SERVICE_ACTION
-      SERVICE_ACTION=${SERVICE_ACTION:-R} # Default to Rename
+      # Add (U)se existing option and make it default
+      read -rp "(U)se existing service, (D)elete and recreate, (R)ename service, or (Q)uit? [U]: " SERVICE_ACTION
+      SERVICE_ACTION=${SERVICE_ACTION:-U} # Default to Use existing
 
       case "${SERVICE_ACTION,,}" in
+        u|use)
+          echo "✓ Using existing service '$SERVICE_NAME'."
+          # Existing service confirmed, break the loop to proceed
+          break
+          ;;
         d|delete)
           echo "Attempting to delete existing service '${SERVICE_NAME}'..."
           # Don't exit on error for the delete command itself, check code
