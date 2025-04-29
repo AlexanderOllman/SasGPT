@@ -625,7 +625,7 @@ while [[ $SECONDS_WAITED_PDN -lt $MAX_WAIT_SECONDS_PDN ]]; do
   GET_PDN_EXIT_CODE=$?
   set -e
 
-  echo "DEBUG: Raw SERVICE_INFO: $SERVICE_INFO"
+  #echo "DEBUG: Raw SERVICE_INFO: $SERVICE_INFO"
 
   # Adjust jq queries for the full output structure
   SERVICE_STATE=$(echo "$SERVICE_INFO" | jq -r '.containerServices[0].state // empty')
@@ -668,12 +668,33 @@ if [[ -z "$SERVICE_PUBLIC_DOMAIN" ]] || [[ "$SERVICE_PUBLIC_DOMAIN" == "None" ]]
   exit 1
 fi
 
+# Strip protocol and trailing slash from the URL for DNS target name
+TARGET_DNS_NAME=$(echo "$SERVICE_PUBLIC_DOMAIN" | sed 's|https://||; s|/$||;')
+echo "ℹ️ Service URL: $SERVICE_PUBLIC_DOMAIN"
+echo "ℹ️ DNS Target Name: $TARGET_DNS_NAME"
+
 pause # Pause after monitoring is complete
 
 # Ensure lightsailctl is available before proceeding to push
 echo ""
 echo "👉 Checking for Lightsail Control plugin (lightsailctl)..."
 ensure_lightsailctl || { echo "❌ Failed to ensure lightsailctl is available. Exiting." >&2; exit 1; }
+
+# --- Deployment Check & Optional Skip --- >
+SKIP_DEPLOY="n" # Default to not skipping
+# Re-fetch service info to check current deployment state
+SERVICE_INFO=$(aws lightsail get-container-services --service-name "$SERVICE_NAME" --region "$AWS_REGION" --output json)
+DEPLOYMENT_STATE=$(echo "$SERVICE_INFO" | jq -r '.containerServices[0].currentDeployment.state // empty')
+
+if [[ "$DEPLOYMENT_STATE" == "ACTIVE" ]] || [[ "$DEPLOYMENT_STATE" == "RUNNING" ]]; then
+  echo "ℹ️ Service '$SERVICE_NAME' already has an active deployment (State: $DEPLOYMENT_STATE)."
+  read -rp "Skip Docker build/push (Step 3) and new deployment (Step 4)? (y/N): " USER_SKIP_DEPLOY
+  SKIP_DEPLOY="${USER_SKIP_DEPLOY:-n}"
+fi
+# --- End Deployment Check ---
+
+# Conditionally execute Steps 3 and 4
+if [[ "${SKIP_DEPLOY,,}" != "y" ]]; then
 
 # ── 3) BUILD & PUSH DOCKER IMAGE ───────────────────────────────────
 
@@ -730,21 +751,58 @@ aws lightsail create-container-service-deployment \
 
 pause
 
+else # User chose to skip steps 3 & 4
+  echo "ℹ️ Skipping Docker build/push (Step 3) and new deployment (Step 4) as requested."
+fi # End conditional execution of Steps 3 & 4
+
 # ── 5) POINT DOMAIN DNS ────────────────────────────────────────────
 
 echo "👉 Step 5: Create DNS record"
 # Use DOMAIN and SERVICE_NAME obtained above
-# SERVICE_PUBLIC_DOMAIN was obtained and validated at the end of Step 2
+# TARGET_DNS_NAME was calculated at the end of Step 2
 
-if [[ -z "$SERVICE_PUBLIC_DOMAIN" ]]; then
-    echo "❌ Error: Internal script error - SERVICE_PUBLIC_DOMAIN is unexpectedly empty at Step 5." >&2
+if [[ -z "$TARGET_DNS_NAME" ]]; then
+    echo "❌ Error: Internal script error - TARGET_DNS_NAME is unexpectedly empty at Step 5." >&2
     exit 1
 fi
 
-echo "ℹ️ Using Target public domain for DNS: $SERVICE_PUBLIC_DOMAIN"
+# Check if DNS entry already exists
+DNS_EXISTS=false
+echo "Checking for existing DNS entry for $DOMAIN -> $TARGET_DNS_NAME..."
+set +e # Don't exit if get-domain fails (e.g., domain not registered via Lightsail DNS)
+DOMAIN_DETAILS=$(aws lightsail get-domain --domain-name "$DOMAIN" --output json 2>&1)
+GET_DOMAIN_EXIT_CODE=$?
+set -e
 
-aws lightsail create-domain-entry \
-  --domain-name "$DOMAIN" \
-  --domain-entry name="$DOMAIN",target="$SERVICE_PUBLIC_DOMAIN",type=A,isAlias=true
+if [[ $GET_DOMAIN_EXIT_CODE -eq 0 ]]; then
+  # Use jq -e to check for the specific entry. It exits 0 if found, 1 otherwise.
+  echo "$DOMAIN_DETAILS" | jq -e --arg domain "$DOMAIN" --arg target "$TARGET_DNS_NAME" \
+    '.domain.domainEntries[] | select(.name == $domain and .type == "A" and .target == $target and .isAlias == true)' > /dev/null
+  JQ_EXIT_CODE=$?
+
+  if [[ $JQ_EXIT_CODE -eq 0 ]]; then
+    DNS_EXISTS=true
+    echo "✅ DNS entry already exists."
+  else
+    echo "ℹ️ DNS entry not found (jq exit code: $JQ_EXIT_CODE)."
+  fi
+else
+  echo "⚠️ Could not retrieve domain details for $DOMAIN (Exit code: $GET_DOMAIN_EXIT_CODE). Assuming DNS entry does not exist or domain is managed elsewhere." 
+  echo "   Error details: $DOMAIN_DETAILS"
+  # Proceed with creation attempt, it might fail if the domain isn't in Lightsail DNS
+fi
+
+if [[ "$DNS_EXISTS" == true ]]; then
+  echo "ℹ️ Skipping DNS entry creation."
+else
+  echo "Attempting to create DNS entry: $DOMAIN -> $TARGET_DNS_NAME..."
+  # Strip protocol and trailing slash for DNS target (already done, TARGET_DNS_NAME holds the value)
+  echo "ℹ️ Using Target DNS Name: $TARGET_DNS_NAME"
+
+  aws lightsail create-domain-entry \
+    --domain-name "$DOMAIN" \
+    --domain-entry name="$DOMAIN",target="$TARGET_DNS_NAME",type=A,isAlias=true
+  # Check exit code?
+fi
 
 echo "🎉 Done! Allow DNS 10–30 minutes, then visit: https://${DOMAIN}"
