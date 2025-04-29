@@ -625,6 +625,8 @@ while [[ $SECONDS_WAITED_PDN -lt $MAX_WAIT_SECONDS_PDN ]]; do
   GET_PDN_EXIT_CODE=$?
   set -e
 
+  echo "DEBUG: Raw SERVICE_INFO: $SERVICE_INFO"
+
   SERVICE_STATE=$(echo "$SERVICE_INFO" | jq -r '.state // empty')
   SERVICE_PUBLIC_DOMAIN=$(echo "$SERVICE_INFO" | jq -r '.domain // empty')
 
