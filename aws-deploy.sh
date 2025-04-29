@@ -620,15 +620,17 @@ while [[ $SECONDS_WAITED_PDN -lt $MAX_WAIT_SECONDS_PDN ]]; do
   SERVICE_INFO=$(aws lightsail get-container-services \
     --service-name "$SERVICE_NAME" \
     --region "$AWS_REGION" \
-    --query "containerServices[?serviceName=='$SERVICE_NAME'] | [0].{state: state, domain: publicDomainName}" \
     --output json)
+    # Removed complex --query, will parse full output below
   GET_PDN_EXIT_CODE=$?
   set -e
 
   echo "DEBUG: Raw SERVICE_INFO: $SERVICE_INFO"
 
-  SERVICE_STATE=$(echo "$SERVICE_INFO" | jq -r '.state // empty')
-  SERVICE_PUBLIC_DOMAIN=$(echo "$SERVICE_INFO" | jq -r '.domain // empty')
+  # Adjust jq queries for the full output structure
+  SERVICE_STATE=$(echo "$SERVICE_INFO" | jq -r '.containerServices[0].state // empty')
+  # Use .url based on documentation for the service's public endpoint
+  SERVICE_PUBLIC_DOMAIN=$(echo "$SERVICE_INFO" | jq -r '.containerServices[0].url // empty') 
 
   echo "  DEBUG: Get Status Exit Code: $GET_PDN_EXIT_CODE, State: '$SERVICE_STATE', Public Domain: '$SERVICE_PUBLIC_DOMAIN'"
 
