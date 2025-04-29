@@ -484,7 +484,8 @@ echo ""
 echo "👉 Ensuring Lightsail DNS zone exists for ${DOMAIN}..."
 DNS_ZONE_EXISTS=false
 set +e # Don't exit if get-domain fails
-aws lightsail get-domain --domain-name "$DOMAIN" > /dev/null 2>&1
+# Explicitly add region
+aws lightsail get-domain --domain-name "$DOMAIN" --region "$AWS_REGION" > /dev/null 2>&1
 GET_ZONE_EXIT_CODE=$?
 set -e
 
@@ -493,10 +494,13 @@ if [[ $GET_ZONE_EXIT_CODE -eq 0 ]]; then
   DNS_ZONE_EXISTS=true
 else
   # Check if the error was specifically NotFoundException
-  if aws lightsail get-domain --domain-name "$DOMAIN" 2>&1 | grep -q 'NotFoundException'; then
+  # Need to capture stderr here to check for exception type
+  GET_DOMAIN_ERROR=$(aws lightsail get-domain --domain-name "$DOMAIN" --region "$AWS_REGION" 2>&1)
+  if echo "$GET_DOMAIN_ERROR" | grep -q 'NotFoundException'; then
     echo "ℹ️ Lightsail DNS zone for ${DOMAIN} not found. Attempting to create..."
     set +e
-    CREATE_ZONE_OUTPUT=$(aws lightsail create-domain --domain-name "$DOMAIN" 2>&1)
+    # Explicitly add region
+    CREATE_ZONE_OUTPUT=$(aws lightsail create-domain --domain-name "$DOMAIN" --region "$AWS_REGION" 2>&1)
     CREATE_ZONE_EXIT_CODE=$?
     set -e
     if [[ $CREATE_ZONE_EXIT_CODE -eq 0 ]]; then
