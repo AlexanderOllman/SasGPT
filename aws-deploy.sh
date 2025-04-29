@@ -10,16 +10,19 @@ YEARS=1
 
 # ── LOAD OR GET CONFIGURATION ──────────────────────────────────────
 
-# Function to prompt for and save credentials/info
-prompt_and_save_config() {
+# Function to prompt for AWS credentials
+prompt_aws_config() {
   echo "👉 AWS Configuration"
   read -rp "Enter AWS Access Key ID: " AWS_ACCESS_KEY_ID
   read -rsp "Enter AWS Secret Access Key: " AWS_SECRET_ACCESS_KEY
-  echo "" # Add a newline after hidden input
+  echo ""
   read -rp "Enter AWS Session Token (optional, press ENTER if none): " AWS_SESSION_TOKEN
   read -rp "Enter AWS Region [${AWS_REGION}]: " USER_AWS_REGION
   AWS_REGION="${USER_AWS_REGION:-$AWS_REGION}" # Use user input or default
+}
 
+# Function to prompt for Domain and App config
+prompt_domain_app_config() {
   echo ""
   echo "👉 Domain Registration & ICANN Contact Info"
   read -rp "Domain to register (e.g. example.com): " DOMAIN
@@ -43,35 +46,30 @@ prompt_and_save_config() {
 
   # --- Collect Custom Environment Variables --- >
   echo "👉 Custom Environment Variables for Application"
-  # Create or clear custom env section marker in temp file
-  CUSTOM_ENV_TEMP_FILE=$(mktemp)
-  echo "# Custom Application Environment Variables" > "$CUSTOM_ENV_TEMP_FILE"
-
+  CUSTOM_ENV_VARS_STRING="" # Store as multiline string for saving
   read -rp "Do you need to add any other environment variables? (y/N): " ADD_CUSTOM_ENV
   if [[ "${ADD_CUSTOM_ENV,,}" == "y" ]]; then
     echo "Enter variable name and value pairs. Press ENTER for the name when finished."
     while true; do
       read -rp "Variable Name (e.g., DATABASE_URL): " VAR_NAME
-      # Exit loop if name is empty
       [[ -z "$VAR_NAME" ]] && break
-      # Check for invalid characters? (Optional, basic check here)
       if [[ ! "$VAR_NAME" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
-         echo "Invalid variable name format. Use letters, numbers, and underscores, starting with a letter or underscore." >&2
+         echo "Invalid variable name format." >&2
          continue
       fi
-      
       read -rsp "Value for ${VAR_NAME}: " VAR_VALUE
       echo ""
-      # Append to temp file, quoting value
-      echo "CUSTOM_ENV_${VAR_NAME}=\"${VAR_VALUE}\"" >> "$CUSTOM_ENV_TEMP_FILE"
+      # Append to string, quoting value
+      CUSTOM_ENV_VARS_STRING+="CUSTOM_ENV_${VAR_NAME}=\"${VAR_VALUE}\"\n"
       echo "  ✓ Added ${VAR_NAME}"
     done
   fi
   # --- End Custom Environment Variables --- >
+}
 
-  # Save to config file
+# Function to save the combined configuration
+save_config() {
   echo "Saving configuration to ${CONFIG_FILE}..."
-  # Combine standard config and custom env vars
   cat > "$CONFIG_FILE" <<EOF
 # AWS Credentials and Configuration
 AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
@@ -94,48 +92,74 @@ CC="${CC}"
 
 # Service Specific Secrets
 OPENAI_API_KEY="${OPENAI_API_KEY}"
-EOF
-  # Append custom vars from temp file
-  cat "$CUSTOM_ENV_TEMP_FILE" >> "$CONFIG_FILE"
-  rm "$CUSTOM_ENV_TEMP_FILE" # Clean up temp file
 
-  chmod 600 "$CONFIG_FILE" # Restrict permissions
+# Custom Application Environment Variables
+${CUSTOM_ENV_VARS_STRING}
+EOF
+  chmod 600 "$CONFIG_FILE"
   echo "✓ Configuration saved."
   echo ""
 }
 
-# Check if config file exists and load if user agrees
+# --- Load or Prompt for Configuration --- >
+
+# Default values (can be overridden by file or prompts)
+DOMAIN=""
+YEARS=1
+FIRST_NAME=""
+LAST_NAME=""
+EMAIL=""
+PHONE=""
+ADDR1=""
+CITY=""
+STATE=""
+ZIP=""
+CC=""
+OPENAI_API_KEY=""
+CUSTOM_ENV_VARS_STRING=""
+
 if [[ -f "$CONFIG_FILE" ]]; then
-  echo "ℹ️ Found existing configuration in ${CONFIG_FILE}:"
-  # Source the file to load variables (careful with execution)
-  # Temporarily disable exit on error in case file is malformed
+  echo "ℹ️ Found existing configuration file: ${CONFIG_FILE}"
+  # Source the file to load all variables
   set +e
   # shellcheck source=/dev/null
   source "$CONFIG_FILE"
   set -e
 
-  # Display non-sensitive loaded values for confirmation
+  # Display some loaded values for confirmation
   echo "  AWS Access Key ID: ${AWS_ACCESS_KEY_ID}"
   echo "  AWS Region:        ${AWS_REGION}"
-  echo "  Domain:            ${DOMAIN}"
-  echo "  Years:             ${YEARS}"
-  echo "  Email:             ${EMAIL}"
-  # Add other non-sensitive fields if needed
+  echo "  Domain:            ${DOMAIN:-<Not Set>}"
+  echo "  Email:             ${EMAIL:-<Not Set>}"
+  echo "  OpenAI Key:        ${OPENAI_API_KEY:+Stored (not displayed)}"
 
-  read -rp "Use these saved settings? (y/N): " USE_SAVED
-  if [[ "${USE_SAVED,,}" == "y" ]]; then
-    echo "✓ Using saved configuration."
-    echo ""
-  else
-    echo "🧹 Clearing old config and prompting for new values."
-    rm -f "$CONFIG_FILE" # Remove old file before prompting
-    prompt_and_save_config
+  REPROMPT_AWS=n
+  read -rp "Re-enter AWS Credentials? (y/N): " USER_REPROMPT_AWS
+  REPROMPT_AWS=${USER_REPROMPT_AWS:-n}
+  if [[ "${REPROMPT_AWS,,}" == "y" ]]; then
+    prompt_aws_config
   fi
-else
-  echo "ℹ️ No configuration file found. Prompting for details..."
-  prompt_and_save_config
-fi
 
+  REPROMPT_APP=n
+  read -rp "Re-enter Domain/App Config (Contact Info, OpenAI Key, Custom Env Vars)? (y/N): " USER_REPROMPT_APP
+  REPROMPT_APP=${USER_REPROMPT_APP:-n}
+  if [[ "${REPROMPT_APP,,}" == "y" ]]; then
+    prompt_domain_app_config
+  else
+    # Need to reconstruct the custom env string if not re-prompting
+    CUSTOM_ENV_VARS_STRING=$(grep '^CUSTOM_ENV_' "$CONFIG_FILE" | paste -sd '\n' - || true)
+  fi
+
+  # Save potentially updated config
+  save_config
+
+else
+  echo "ℹ️ No configuration file found. Prompting for all details..."
+  prompt_aws_config
+  prompt_domain_app_config
+  save_config
+fi
+# --- End Load or Prompt --- >
 
 # ── EXPORT AWS CREDENTIALS ─────────────────────────────────────────
 # Ensure required AWS vars are exported if loaded from file or newly entered
@@ -482,42 +506,50 @@ fi
 # --- Ensure Lightsail DNS Zone Exists --- >
 echo ""
 echo "👉 Ensuring Lightsail DNS zone exists for ${DOMAIN}..."
-DNS_ZONE_EXISTS=false
-set +e # Don't exit if get-domain fails
-# Explicitly add region
+
+# Check if zone exists
+set +e # Temporarily disable exit on error
 aws lightsail get-domain --domain-name "$DOMAIN" --region "$AWS_REGION" > /dev/null 2>&1
 GET_ZONE_EXIT_CODE=$?
-set -e
+set -e # Re-enable exit on error
 
 if [[ $GET_ZONE_EXIT_CODE -eq 0 ]]; then
   echo "✅ Lightsail DNS zone for ${DOMAIN} already exists."
-  DNS_ZONE_EXISTS=true
 else
-  # Check if the error was specifically NotFoundException
-  # Need to capture stderr here to check for exception type
+  echo "ℹ️ Attempting to check/create Lightsail DNS zone for ${DOMAIN} (get-domain initial check failed with code: $GET_ZONE_EXIT_CODE)"
+  # Re-run get-domain to capture specific error message
+  set +e # Temporarily disable exit on error
   GET_DOMAIN_ERROR=$(aws lightsail get-domain --domain-name "$DOMAIN" --region "$AWS_REGION" 2>&1)
-  if echo "$GET_DOMAIN_ERROR" | grep -q 'NotFoundException'; then
-    echo "ℹ️ Lightsail DNS zone for ${DOMAIN} not found. Attempting to create..."
-    set +e
-    # Explicitly add region
+  GET_DOMAIN_ERROR_CODE=$?
+  set -e # Re-enable exit on error
+
+  # Check if the specific error was NotFoundException
+  if [[ $GET_DOMAIN_ERROR_CODE -ne 0 ]] && echo "$GET_DOMAIN_ERROR" | grep -q 'NotFoundException'; then
+    echo "   Lightsail DNS zone for ${DOMAIN} not found. Attempting to create..."
+    set +e # Temporarily disable exit on error
     CREATE_ZONE_OUTPUT=$(aws lightsail create-domain --domain-name "$DOMAIN" --region "$AWS_REGION" 2>&1)
     CREATE_ZONE_EXIT_CODE=$?
-    set -e
+    set -e # Re-enable exit on error
+
     if [[ $CREATE_ZONE_EXIT_CODE -eq 0 ]]; then
       echo "✅ Successfully created Lightsail DNS zone for ${DOMAIN}."
-      DNS_ZONE_EXISTS=true
       # Optional: Pause to allow zone propagation, though usually fast
       # wait_with_animation 10 "Waiting for DNS zone creation"
     else
-      echo "❌ Failed to create Lightsail DNS zone for ${DOMAIN}: $CREATE_ZONE_OUTPUT" >&2
-      echo "   You might need to create it manually in the Lightsail console." >&2
-      # Decide if we should exit or try to continue (Step 5 will likely fail again)
-      # For now, let's continue and let Step 5 fail clearly.
+      echo "❌ Failed to create Lightsail DNS zone for ${DOMAIN} (Exit Code: $CREATE_ZONE_EXIT_CODE):" >&2
+      echo "$CREATE_ZONE_OUTPUT" >&2
+      echo "   You might need to create it manually in the Lightsail console before proceeding." >&2
+      exit 1 # Exit if zone creation fails, as subsequent steps will fail
     fi
-  else
+  elif [[ $GET_DOMAIN_ERROR_CODE -ne 0 ]]; then
     # Some other error occurred during get-domain
-    echo "⚠️ An unexpected error occurred while checking for DNS zone ${DOMAIN} (Exit Code: $GET_ZONE_EXIT_CODE)." >&2
-    # Continue, but Step 5 might fail.
+    echo "⚠️ An unexpected error occurred while checking for DNS zone ${DOMAIN} (Exit Code: $GET_DOMAIN_ERROR_CODE):" >&2
+    echo "$GET_DOMAIN_ERROR" >&2
+    echo "   Please resolve the issue (e.g., check IAM permissions) and re-run." >&2
+    exit 1 # Exit on unexpected errors
+  else
+      # This case should ideally not be reached if the first check failed, but handle defensively
+      echo "✅ Lightsail DNS zone for ${DOMAIN} exists (second check passed unexpectedly)."
   fi
 fi
 # --- End DNS Zone Check --- >
