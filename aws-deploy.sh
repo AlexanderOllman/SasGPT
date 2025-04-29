@@ -940,15 +940,25 @@ fi
 DNS_EXISTS=false
 echo "Checking for existing DNS entry for $DOMAIN -> $TARGET_DNS_NAME..."
 set +e # Don't exit if get-domain fails (e.g., domain not registered via Lightsail DNS)
-DOMAIN_DETAILS=$(aws lightsail get-domain --domain-name "$DOMAIN" --output json 2>&1)
+
+echo "DEBUG: Running get-domain..."
+DOMAIN_DETAILS=$(aws lightsail get-domain --domain-name "$DOMAIN" --region "$AWS_REGION" --output json 2>&1)
 GET_DOMAIN_EXIT_CODE=$?
-set -e
+echo "DEBUG: get-domain finished. Exit code: $GET_DOMAIN_EXIT_CODE"
+
+set -e # Re-enable error checking
 
 if [[ $GET_DOMAIN_EXIT_CODE -eq 0 ]]; then
+  echo "DEBUG: get-domain succeeded. Checking details with jq..."
   # Use jq -e to check for the specific entry. It exits 0 if found, 1 otherwise.
+  # Print details before jq
+  echo "DEBUG: Raw DOMAIN_DETAILS to be processed by jq:"
+  echo "$DOMAIN_DETAILS"
+  
   echo "$DOMAIN_DETAILS" | jq -e --arg domain "$DOMAIN" --arg target "$TARGET_DNS_NAME" \
     '.domain.domainEntries[] | select(.name == $domain and .type == "A" and .target == $target and .isAlias == true)' > /dev/null
   JQ_EXIT_CODE=$?
+  echo "DEBUG: jq finished. Exit code: $JQ_EXIT_CODE"
 
   if [[ $JQ_EXIT_CODE -eq 0 ]]; then
     DNS_EXISTS=true
@@ -957,8 +967,10 @@ if [[ $GET_DOMAIN_EXIT_CODE -eq 0 ]]; then
     echo "ℹ️ DNS entry not found (jq exit code: $JQ_EXIT_CODE)."
   fi
 else
-  echo "⚠️ Could not retrieve domain details for $DOMAIN (Exit code: $GET_DOMAIN_EXIT_CODE). Assuming DNS entry does not exist or domain is managed elsewhere." 
-  echo "   Error details: $DOMAIN_DETAILS"
+  echo "⚠️ Could not retrieve domain details for $DOMAIN (get-domain exit code: $GET_DOMAIN_EXIT_CODE). Assuming DNS entry does not exist or domain is managed elsewhere." 
+  # Print error details if get-domain failed
+  echo "DEBUG: Raw DOMAIN_DETAILS (Error Output):"
+  echo "$DOMAIN_DETAILS"
   # Proceed with creation attempt, it might fail if the domain isn't in Lightsail DNS
 fi
 
