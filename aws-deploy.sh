@@ -232,45 +232,46 @@ ensure_lightsailctl() {
   fi
 }
 
-# ── 0) INSTALL AWS CLI V2 IF NEEDED ────────────────────────────────
+# ── ENSURE JQ IS INSTALLED ─────────────────────────────────────────
 
-if ! command -v aws >/dev/null 2>&1 || [[ "$(aws --version 2>&1)" != aws-cli/2* ]]; then
-  echo "🔧 Installing AWS CLI v2..."
+if ! command -v jq >/dev/null 2>&1; then
+  echo "🔧 jq (JSON processor) not found. Attempting to install..."
   OS=$(uname -s)
-  ARCH=$(uname -m)
 
   if [[ "$OS" == "Linux" ]]; then
-    # Ensure unzip
-    if ! command -v unzip >/dev/null 2>&1; then
-      echo "  • Installing unzip..."
-      if command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get update && sudo apt-get install -y unzip
-      elif command -v yum >/dev/null 2>&1; then
-        sudo yum install -y unzip
-      fi
-    fi
-
-    if [[ "$ARCH" == "x86_64" ]]; then
-      curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-      unzip awscliv2.zip
-      sudo ./aws/install
-    elif [[ "$ARCH" =~ ^(aarch64|arm64)$ ]]; then
-      echo "  • ARM64 detected—falling back to AWS CLI v1 via pip"
-      python3 -m pip install --upgrade awscli
+    if command -v apt-get >/dev/null 2>&1; then
+      echo "  • Installing jq using apt-get..."
+      sudo apt-get update && sudo apt-get install -y jq
+    elif command -v yum >/dev/null 2>&1; then
+      echo "  • Installing jq using yum..."
+      sudo yum install -y jq
     else
-      echo "  • Unknown architecture $ARCH—skipping AWS CLI install"
+      echo "⚠️ Could not find apt-get or yum. Please install jq manually."
+      echo "   See: https://stedolan.github.io/jq/download/"
+      exit 1
     fi
-
   elif [[ "$OS" == "Darwin" ]]; then
     if command -v brew >/dev/null 2>&1; then
-      brew install awscli
+      echo "  • Installing jq using Homebrew..."
+      brew install jq
     else
-      curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
-      sudo installer -pkg AWSCLIV2.pkg -target /
+      echo "⚠️ Homebrew not found. Please install jq manually."
+      echo "   Using Homebrew (https://brew.sh/) is recommended: brew install jq"
+      echo "   Alternatively, see: https://stedolan.github.io/jq/download/"
+      exit 1
     fi
-
   else
-    echo "⚠️ Unsupported OS: $OS. Please install AWS CLI manually."
+    echo "⚠️ Unsupported OS for automatic jq installation: $OS. Please install jq manually."
+    echo "   See: https://stedolan.github.io/jq/download/"
+    exit 1
+  fi
+
+  # Verify installation
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "❌ jq installation failed or was not detected. Please install it manually and rerun the script."
+    exit 1
+  else
+    echo "✓ jq installed successfully."
   fi
 fi
 
